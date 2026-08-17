@@ -2,7 +2,7 @@
 """
 Physical button daemon.
 
-Polls GPIO6 (play/pause), GPIO13 (skip), GPIO5 (previous), GPIO24 (snooze)
+Polls GPIO12 (play/pause), GPIO6 (skip), GPIO13 (previous)
 every 5 ms and emits newline-delimited JSON events to every client connected
 on the Unix domain socket at /tmp/kmp-buttons.sock.
 
@@ -10,7 +10,6 @@ Events:
     {"event": "play_pause"}
     {"event": "skip"}
     {"event": "previous"}
-    {"event": "snooze"}
 
 Active LOW with internal pull-ups. Software debounce: 50 ms.
 Uses lgpio polling (gpio_read) — the lgpio callback/alert mechanism is
@@ -36,10 +35,9 @@ POLL_HZ   = 200      # poll every 5 ms
 DEBOUNCE  = 0.050    # 50 ms software debounce
 
 BUTTON_MAP = {
-    6:  "play_pause",
-    13: "skip",
-    5:  "previous",
-    24: "snooze",
+    12: "play_pause",
+    6:  "skip",
+    13: "previous",
 }
 
 _clients: list[socket.socket] = []
