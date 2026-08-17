@@ -28,19 +28,19 @@ export function Settings({ palette, lang, settings, onSettings, onNavigate }: Se
       background: 'rgba(255,255,255,0.15)',
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       border: '1px solid rgba(255,255,255,0.18)',
-      borderRadius: r, padding: 16, flexShrink: 0,
+      borderRadius: 'var(--r)', padding: 'var(--gap)', flexShrink: 0,
     }}>
-      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 'var(--fs-sm)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 'var(--gap-sm)' }}>
         {title}
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{children}</div>
+      <div style={{ display: 'flex', gap: 'var(--gap-xs)', flexWrap: 'wrap' }}>{children}</div>
     </div>
   )
 
   const Chip = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
     <button onClick={onClick} style={{
-      padding: '10px 16px', borderRadius: 999, border: 'none',
-      fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit',
+      padding: 'var(--gap-sm) var(--gap)', borderRadius: 999, border: 'none',
+      fontWeight: 800, fontSize: 'var(--fs-body)', cursor: 'pointer', fontFamily: 'inherit',
       background: active ? '#fff' : 'rgba(255,255,255,0.18)',
       color: active ? palette.accentPlay : '#fff',
       transition: 'background 0.15s, color 0.15s',
@@ -49,18 +49,18 @@ export function Settings({ palette, lang, settings, onSettings, onNavigate }: Se
 
   return (
     <div style={{
-      width: 800, height: 480, background: palette.clock,
-      display: 'flex', flexDirection: 'column', padding: 24, gap: 16, overflow: 'hidden',
+      width: '100%', height: '100%', background: palette.clock,
+      display: 'flex', flexDirection: 'column', padding: 'var(--pad)', gap: 'var(--gap)', overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <CircleBtn size={56} onClick={() => onNavigate('clock')}><IconBack size={26} /></CircleBtn>
-        <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 800, margin: 0 }}>{t(lang, 'settings')}</h1>
-        <div style={{ width: 56 }} />
+        <CircleBtn onClick={() => onNavigate('clock')}><IconBack size="var(--icon)" /></CircleBtn>
+        <h1 style={{ color: '#fff', fontSize: 'var(--fs-h1)', fontWeight: 800, margin: 0 }}>{t(lang, 'settings')}</h1>
+        <div style={{ width: 'var(--btn)' }} />
       </div>
 
       {/* Rows */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--gap-sm)', overflowY: 'auto' }}>
         <Row title={t(lang, 'language')}>
           <Chip active={settings.lang === 'en'} onClick={() => set('lang', 'en')}>English</Chip>
           <Chip active={settings.lang === 'fr'} onClick={() => set('lang', 'fr')}>Français</Chip>

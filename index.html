@@ -5,6 +5,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>Alarm Clock</title>
+  <script>
+    if (!window.electronAPI) {
+      window.electronAPI = {
+        platform: 'darwin',
+        audio: {
+          getState: () => Promise.resolve({ isPlaying: false, currentTrack: null, position: 0, duration: 0, volume: 70, queue: [], queueIndex: -1 }),
+          scanMedia: () => Promise.resolve([
+            { id: '1', filename: 'song1.mp3', filepath: '/media/song1.mp3', title: 'Twinkle Twinkle Little Star', duration: 180 },
+            { id: '2', filename: 'song2.mp3', filepath: '/media/song2.mp3', title: 'Baby Shark', duration: 120 },
+            { id: '3', filename: 'song3.mp3', filepath: '/media/song3.mp3', title: 'Wheels on the Bus', duration: 200 },
+          ]),
+          play: () => Promise.resolve(), pause: () => Promise.resolve(),
+          resume: () => Promise.resolve(), togglePlayPause: () => Promise.resolve(),
+          stop: () => Promise.resolve(), setVolume: () => Promise.resolve(),
+          setQueue: () => {}, next: () => Promise.resolve(), previous: () => Promise.resolve(),
+          onStateChange: () => () => {}, onTrackEnded: () => () => {},
+        },
+        alarm: {
+          getAlarm: () => Promise.resolve({ id: 1, time: '07:00', enabled: true, sound_path: null, snooze_minutes: 5, auto_dismiss_minutes: 5 }),
+          setAlarm: (_t, enabled, sound) => Promise.resolve({ id: 1, time: _t, enabled, sound_path: sound ?? null, snooze_minutes: 5, auto_dismiss_minutes: 5 }),
+          snooze: () => Promise.resolve(), dismiss: () => Promise.resolve(),
+          onFired: () => () => {}, onDismissed: () => () => {}, onUpdated: () => () => {},
+        },
+        wifi: { getStatus: () => Promise.resolve({ apMode: false, hotspotIp: null }), onConnected: () => () => {} },
+        sync: { getDevice: () => Promise.resolve(null), getDiff: () => Promise.resolve({ toCopy: [], toSkip: [], orphans: [] }), startSync: () => Promise.resolve(), eject: () => Promise.resolve(), onEvent: () => () => {} },
+      };
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@200;400;500;600;700;800;900&display=swap" rel="stylesheet">

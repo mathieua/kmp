@@ -11,21 +11,21 @@ interface AlarmsProps {
 
 function Stepper({ value, onInc, onDec }: { value: number; onInc: () => void; onDec: () => void }) {
   const btn: React.CSSProperties = {
-    width: 64, height: 40, borderRadius: 12,
+    width: 'min(8vw, 13.33vh)', height: 'min(5vw, 8.33vh)', borderRadius: 'var(--r-xs)',
     background: '#ede9fe', color: '#7c3aed', border: 'none',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', padding: 0, fontFamily: 'inherit',
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: '#f3f4f6', borderRadius: 18, padding: '8px 6px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--gap-xs)', background: '#f3f4f6', borderRadius: 'var(--r-sm)', padding: 'min(1vw, 1.67vh) min(0.75vw, 1.25vh)' }}>
       <button style={btn} onClick={onInc}
         onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.92)')}
         onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
         onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
       >
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'var(--icon)', height: 'var(--icon)' }}><path d="m6 15 6-6 6 6"/></svg>
       </button>
-      <div style={{ fontSize: 48, fontWeight: 900, color: '#7c3aed', lineHeight: 1, fontVariantNumeric: 'tabular-nums', minWidth: 76, textAlign: 'center' }}>
+      <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 900, color: '#7c3aed', lineHeight: 1, fontVariantNumeric: 'tabular-nums', minWidth: 'min(9.5vw, 15.83vh)', textAlign: 'center' }}>
         {String(value).padStart(2, '0')}
       </div>
       <button style={btn} onClick={onDec}
@@ -33,7 +33,7 @@ function Stepper({ value, onInc, onDec }: { value: number; onInc: () => void; on
         onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
         onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
       >
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'var(--icon)', height: 'var(--icon)' }}><path d="m6 9 6 6 6-6"/></svg>
       </button>
     </div>
   )
@@ -93,62 +93,62 @@ export function Alarms({ palette, lang, onNavigate }: AlarmsProps) {
 
   return (
     <div style={{
-      width: 800, height: 480, background: palette.alarms,
-      display: 'flex', flexDirection: 'column', padding: 24, gap: 16, overflow: 'hidden',
+      width: '100%', height: '100%', background: palette.alarms,
+      display: 'flex', flexDirection: 'column', padding: 'var(--pad)', gap: 'var(--gap)', overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <CircleBtn size={56} onClick={() => onNavigate('clock')}><IconBack size={26} /></CircleBtn>
-        <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 800, margin: 0 }}>{t(lang, 'alarms')}</h1>
+        <CircleBtn onClick={() => onNavigate('clock')}><IconBack size="var(--icon)" /></CircleBtn>
+        <h1 style={{ color: '#fff', fontSize: 'var(--fs-h1)', fontWeight: 800, margin: 0 }}>{t(lang, 'alarms')}</h1>
         {alarm && !editing ? (
-          <CircleBtn size={56} bg="#facc15" color="#fff" onClick={openEdit}>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          <CircleBtn bg="#facc15" color="#fff" onClick={openEdit}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'var(--icon)', height: 'var(--icon)' }}><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </CircleBtn>
-        ) : <div style={{ width: 56 }} />}
+        ) : <div style={{ width: 'var(--btn)' }} />}
       </div>
 
       {/* Time stepper (edit mode) */}
       {editing && (
-        <div style={{ background: '#fff', borderRadius: r - 4, padding: 16, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
+        <div style={{ background: '#fff', borderRadius: 'var(--r-sm)', padding: 'var(--gap)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--gap-sm)', marginBottom: 'var(--gap)' }}>
             <Stepper value={editHour}   onInc={() => bumpHour(1)}   onDec={() => bumpHour(-1)} />
-            <div style={{ fontSize: 44, fontWeight: 900, color: '#7c3aed', lineHeight: 1, padding: '0 4px' }}>:</div>
+            <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 900, color: '#7c3aed', lineHeight: 1, padding: '0 min(0.5vw, 0.83vh)' }}>:</div>
             <Stepper value={editMinute} onInc={() => bumpMinute(5)} onDec={() => bumpMinute(-5)} />
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={save} style={{ flex: 1, background: '#22c55e', color: '#fff', border: 'none', padding: '12px 0', borderRadius: 14, fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{t(lang, 'save')}</button>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, background: 'transparent', color: '#374151', border: '2px solid #e5e7eb', padding: '12px 0', borderRadius: 14, fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{t(lang, 'cancel')}</button>
+          <div style={{ display: 'flex', gap: 'var(--gap-sm)' }}>
+            <button onClick={save} style={{ flex: 1, background: '#22c55e', color: '#fff', border: 'none', padding: 'var(--gap-sm) 0', borderRadius: 'var(--r-sm)', fontSize: 'var(--fs-body)', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{t(lang, 'save')}</button>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, background: 'transparent', color: '#374151', border: '2px solid #e5e7eb', padding: 'var(--gap-sm) 0', borderRadius: 'var(--r-sm)', fontSize: 'var(--fs-body)', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{t(lang, 'cancel')}</button>
           </div>
         </div>
       )}
 
       {/* Alarm row (view mode) */}
       {!editing && alarm && (
-        <div style={{ background: '#fff', borderRadius: r - 4, padding: 16, opacity: alarm.enabled ? 1 : 0.55, transition: 'opacity 0.2s ease', flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ background: '#fff', borderRadius: 'var(--r-sm)', padding: 'var(--gap)', opacity: alarm.enabled ? 1 : 0.55, transition: 'opacity 0.2s ease', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--gap-sm)' }}>
             <button onClick={openEdit} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#7c3aed', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{alarm.time}</div>
+              <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 800, color: '#7c3aed', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{alarm.time}</div>
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--gap-sm)' }}>
               <Switch checked={alarm.enabled} onChange={toggleEnabled} />
               <button onClick={() => setAlarmTime(alarm.time, false, alarm.sound_path)} style={{
-                background: '#fee2e2', border: 'none', color: '#dc2626', width: 44, height: 44,
+                background: '#fee2e2', border: 'none', color: '#dc2626', width: 'var(--btn-sm)', height: 'var(--btn-sm)',
                 borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
               }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'var(--icon)', height: 'var(--icon)' }}>
                   <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
                   <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
               </button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 'var(--gap-xs)' }}>
             {DAYS_EN.map((d, i) => {
               const active = activeDays.includes(d)
               return (
                 <button key={d} onClick={() => toggleDay(d)} style={{
-                  flex: 1, padding: '8px 0', borderRadius: 12, border: 'none',
-                  fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+                  flex: 1, padding: 'var(--gap-xs) 0', borderRadius: 'var(--r-xs)', border: 'none',
+                  fontWeight: 800, fontSize: 'var(--fs-sm)', cursor: 'pointer', fontFamily: 'inherit',
                   background: active ? '#3b82f6' : '#e5e7eb', color: active ? '#fff' : '#9ca3af',
                   transition: 'background 0.15s',
                 }}>{days[i]}</button>
@@ -160,13 +160,13 @@ export function Alarms({ palette, lang, onNavigate }: AlarmsProps) {
 
       {/* Empty state + add button */}
       {!editing && !alarm && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-          <div style={{ background: 'rgba(255,255,255,0.18)', borderRadius: r, padding: 28, textAlign: 'center', color: 'rgba(255,255,255,0.95)' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{t(lang, 'noAlarms')}</div>
-            <div style={{ fontSize: 15, opacity: 0.9 }}>{t(lang, 'addFirst')}</div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--gap)' }}>
+          <div style={{ background: 'rgba(255,255,255,0.18)', borderRadius: 'var(--r)', padding: 'var(--pad)', textAlign: 'center', color: 'rgba(255,255,255,0.95)' }}>
+            <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, marginBottom: 'var(--gap-xs)' }}>{t(lang, 'noAlarms')}</div>
+            <div style={{ fontSize: 'var(--fs-body)', opacity: 0.9 }}>{t(lang, 'addFirst')}</div>
           </div>
-          <CircleBtn size={56} bg="#facc15" color="#fff" onClick={openEdit}>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          <CircleBtn bg="#facc15" color="#fff" onClick={openEdit}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 'var(--icon)', height: 'var(--icon)' }}><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           </CircleBtn>
         </div>
       )}

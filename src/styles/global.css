@@ -4,6 +4,54 @@
   box-sizing: border-box;
 }
 
+/* ── Responsive design tokens ─────────────────────────────────────────────────
+   Formula: min(X/8 * 1vw, X*5/24 * 1vh) gives value X at 800×480
+   and scales proportionally up to 1280×720 (and any other screen).
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Spacing */
+  --pad:    min(3vw, 5vh);           /* 24px */
+  --gap:    min(2.25vw, 3.75vh);     /* 18px */
+  --gap-sm: min(1.25vw, 2.08vh);     /* 10px */
+  --gap-xs: min(0.875vw, 1.46vh);    /*  7px */
+
+  /* Border radius */
+  --r:      min(3.5vw, 5.83vh);      /* 28px */
+  --r-sm:   min(2.5vw, 4.17vh);      /* 20px */
+  --r-xs:   min(1.5vw, 2.5vh);       /* 12px */
+
+  /* Buttons & pills */
+  --btn:    min(7vw, 11.67vh);       /* 56px */
+  --btn-sm: min(6vw, 10vh);          /* 48px */
+  --btn-lg: min(9.5vw, 15.83vh);     /* 76px */
+  --pill:   min(7.5vw, 12.5vh);      /* 60px */
+
+  /* Font sizes */
+  --fs-clock: min(16.5vw, 27.5vh);   /* 132px */
+  --fs-dim:   min(22.5vw, 37.5vh);   /* 180px */
+  --fs-alarm-overlay: min(11vw, 18.33vh); /* 88px */
+  --fs-xl:    min(5vw, 8.33vh);      /*  40px */
+  --fs-h1:    min(3.5vw, 5.83vh);    /*  28px */
+  --fs-h2:    min(2.75vw, 4.58vh);   /*  22px */
+  --fs-h3:    min(2.25vw, 3.75vh);   /*  18px */
+  --fs-alarm: min(4vw, 6.67vh);      /*  32px */
+  --fs-date:  min(3.25vw, 5.42vh);   /*  26px */
+  --fs-body:  min(2vw, 3.33vh);      /*  16px */
+  --fs-sm:    min(1.625vw, 2.71vh);  /*  13px */
+  --fs-xs:    min(1.5vw, 2.5vh);     /*  12px */
+
+  /* Icons */
+  --icon-sm: min(2.25vw, 3.75vh);    /* 18px */
+  --icon:    min(3.25vw, 5.42vh);    /* 26px */
+  --icon-lg: min(4.5vw, 7.5vh);      /* 36px */
+  --icon-xl: min(7.75vw, 12.92vh);   /* 62px */
+
+  /* Media */
+  --art:      min(21vw, 35vh);       /* 168px */
+  --thumb:    min(6vw, 10vh);        /* 48px */
+  --thumb-lg: min(9vw, 15vh);        /* 72px */
+}
+
 html, body, #root {
   width: 100%;
   height: 100%;
@@ -54,7 +102,7 @@ button {
 }
 
 .alarm-overlay-time {
-  font-size: 88px;
+  font-size: var(--fs-alarm-overlay);
   font-weight: 200;
   letter-spacing: -0.04em;
   color: rgba(255,255,255,0.9);
@@ -62,28 +110,28 @@ button {
 }
 
 .alarm-overlay-label {
-  font-size: 28px;
+  font-size: var(--fs-h1);
   font-weight: 600;
   color: rgba(255,255,255,0.75);
-  margin-bottom: 16px;
+  margin-bottom: var(--gap);
 }
 
 .alarm-overlay-actions {
   display: flex;
-  gap: 24px;
+  gap: var(--pad);
 }
 
 .alarm-overlay-btn {
-  min-width: 160px;
-  padding: 20px 24px;
+  min-width: min(20vw, 33.33vh);
+  padding: var(--gap) var(--pad);
   border: none;
-  border-radius: 16px;
+  border-radius: var(--r-xs);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  font-size: 22px;
+  gap: var(--gap-xs);
+  font-size: var(--fs-h2);
   font-weight: 700;
   font-family: inherit;
   transition: transform 0.12s ease;
@@ -104,7 +152,7 @@ button {
 }
 
 .alarm-overlay-btn-sub {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   opacity: 0.7;
 }

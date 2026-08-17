@@ -114,29 +114,11 @@ const loadSettings = (): AppSettings => {
 }
 const saveSettings = (s: AppSettings) => localStorage.setItem(SETTINGS_KEY, JSON.stringify(s))
 
-// ── Stage (responsive scaling) ─────────────────────────────────────────────
+// ── Stage ──────────────────────────────────────────────────────────────────
 function Stage({ children }: { children: React.ReactNode }) {
-  const [scale, setScale] = useState(1)
-  useEffect(() => {
-    const recalc = () => {
-      const sx = window.innerWidth / 800
-      const sy = window.innerHeight / 480
-      setScale(Math.min(sx, sy))
-    }
-    recalc()
-    window.addEventListener('resize', recalc)
-    return () => window.removeEventListener('resize', recalc)
-  }, [])
   return (
-    <div style={{
-      width: '100vw', height: '100vh',
-      background: '#000',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      overflow: 'hidden',
-    }}>
-      <div style={{ transform: `scale(${scale})`, transformOrigin: 'center center' }}>
-        {children}
-      </div>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
+      {children}
     </div>
   )
 }

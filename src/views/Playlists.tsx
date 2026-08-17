@@ -35,18 +35,18 @@ export function Playlists({ palette, lang, onNavigate }: PlaylistsProps) {
 
   return (
     <div style={{
-      width: 800, height: 480, background: palette.music,
-      display: 'flex', flexDirection: 'column', padding: 24, gap: 16, overflow: 'hidden',
+      width: '100%', height: '100%', background: palette.music,
+      display: 'flex', flexDirection: 'column', padding: 'var(--pad)', gap: 'var(--gap)', overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <CircleBtn size={56} onClick={() => onNavigate('clock')}><IconBack size={26} /></CircleBtn>
-        <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 800, margin: 0 }}>{t(lang, 'playlists')}</h1>
-        <div style={{ width: 56 }} />
+        <CircleBtn onClick={() => onNavigate('clock')}><IconBack size="var(--icon)" /></CircleBtn>
+        <h1 style={{ color: '#fff', fontSize: 'var(--fs-h1)', fontWeight: 800, margin: 0 }}>{t(lang, 'playlists')}</h1>
+        <div style={{ width: 'var(--btn)' }} />
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', paddingRight: 4 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--gap-sm)', overflowY: 'auto', paddingRight: 4 }}>
         {allPlaylists.map(p => (
           <button key={p.id}
             onClick={() => onNavigate('music')}
@@ -54,8 +54,8 @@ export function Playlists({ palette, lang, onNavigate }: PlaylistsProps) {
               background: 'rgba(255,255,255,0.15)',
               backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
               border: '1px solid rgba(255,255,255,0.18)',
-              borderRadius: r, padding: 14,
-              display: 'flex', alignItems: 'center', gap: 16,
+              borderRadius: 'var(--r)', padding: 'var(--gap-sm)',
+              display: 'flex', alignItems: 'center', gap: 'var(--gap)',
               cursor: 'pointer', textAlign: 'left', color: '#fff',
               transition: 'transform 0.12s ease, background 0.15s',
               flexShrink: 0, fontFamily: 'inherit',
@@ -65,22 +65,22 @@ export function Playlists({ palette, lang, onNavigate }: PlaylistsProps) {
             onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
           >
             <div style={{
-              width: 72, height: 72, borderRadius: r - 10, background: p.cover,
+              width: 'var(--thumb-lg)', height: 'var(--thumb-lg)', borderRadius: 'var(--r-sm)', background: p.cover,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 36, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', flexShrink: 0,
+              fontSize: 'var(--fs-h1)', boxShadow: '0 8px 22px rgba(0,0,0,0.22)', flexShrink: 0,
             }}>{p.emoji}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.1, marginBottom: 4 }}>{p.title}</div>
-              <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+              <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, lineHeight: 1.1, marginBottom: 'var(--gap-xs)' }}>{p.title}</div>
+              <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, opacity: 0.85 }}>
                 {p.subtitle} · {p.count} {t(lang, 'songs')}
               </div>
             </div>
             <div style={{
-              width: 44, height: 44, borderRadius: '50%',
+              width: 'var(--btn-sm)', height: 'var(--btn-sm)', borderRadius: '50%',
               background: 'rgba(255,255,255,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              <IconChevronRight size={22} stroke="#fff" />
+              <IconChevronRight size="var(--icon)" stroke="#fff" />
             </div>
           </button>
         ))}

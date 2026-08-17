@@ -1,17 +1,18 @@
 import React from 'react'
 
 interface IconProps {
-  size?: number
+  size?: number | string
   stroke?: string
   fill?: string
   sw?: number
 }
 
 function Icon({ size = 24, stroke = 'currentColor', fill = 'none', sw = 2.2, children }: IconProps & { children?: React.ReactNode }) {
+  const dim = typeof size === 'number' ? `${size}px` : size
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke}
+    <svg viewBox="0 0 24 24" fill={fill} stroke={stroke}
       strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
-      style={{ display: 'block', flexShrink: 0 }}>
+      style={{ width: dim, height: dim, display: 'block', flexShrink: 0 }}>
       {children}
     </svg>
   )
@@ -108,19 +109,20 @@ export const IconChevronDown = (p: IconProps) => (
 interface CircleBtnProps {
   onClick?: (e: React.MouseEvent) => void
   children: React.ReactNode
-  size?: number
+  size?: number | string
   bg?: string
   color?: string
   shadow?: string
   style?: React.CSSProperties
 }
 
-export function CircleBtn({ onClick, children, size = 56, bg = 'rgba(255,255,255,0.22)', color = '#fff', shadow, style }: CircleBtnProps) {
+export function CircleBtn({ onClick, children, size = 'var(--btn)', bg = 'rgba(255,255,255,0.22)', color = '#fff', shadow, style }: CircleBtnProps) {
+  const dim = typeof size === 'number' ? `${size}px` : size
   return (
     <button
       onClick={onClick}
       style={{
-        width: size, height: size, borderRadius: '50%',
+        width: dim, height: dim, borderRadius: '50%',
         background: bg, color, border: 'none',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', padding: 0, flexShrink: 0,
