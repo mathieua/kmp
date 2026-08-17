@@ -1,0 +1,19 @@
+[Unit]
+Description=Kids Clock — WiFi provisioning check
+# Must run after NM is up, and MUST finish (AP mode included) before tty1
+# auto-login fires — that login triggers `startx` -> the Electron app via
+# .bashrc, and the app only checks /tmp/wifi-ap-mode once on launch. Without
+# these Before= lines the two race: on a boot with no known WiFi in range,
+# the app would routinely win the race and load the normal UI instead of
+# the setup screen, with AP mode only appearing seconds later unnoticed.
+After=NetworkManager.service
+Wants=NetworkManager.service
+Before=multi-user.target getty@tty1.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/pi/alarm-clock/scripts/wifi-check.sh
+
+[Install]
+WantedBy=multi-user.target

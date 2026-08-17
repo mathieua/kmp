@@ -1,6 +1,7 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import * as fs from 'fs'
+import * as os from 'os'
 
 const execAsync = promisify(exec)
 
@@ -14,11 +15,19 @@ export interface WifiNetwork {
 export interface WifiStatus {
   apMode: boolean
   hotspotIp: string | null
+  hotspotSsid: string | null
+  hostname: string | null
 }
 
 const AP_MODE_FLAG = '/tmp/wifi-ap-mode'
-const HOTSPOT_CON = 'leo-clock-setup'
 const HOTSPOT_DEFAULT_IP = '10.42.0.1'
+
+// Matches scripts/wifi-check.sh: SSID/connection name is always
+// "<hostname>-setup", so both sides stay in sync with zero shared config —
+// no per-device string to hardcode or forget to update after a rename.
+function getHotspotConName(): string {
+  return `${os.hostname()}-setup`
+}
 
 // ── nmcli terse output parser ─────────────────────────────────────────────────
 // nmcli -t escapes colons inside values as \: so we must parse carefully.
@@ -49,10 +58,10 @@ export class WifiService {
 
   async getStatus(): Promise<WifiStatus> {
     if (!this.isApMode()) {
-      return { apMode: false, hotspotIp: null }
+      return { apMode: false, hotspotIp: null, hotspotSsid: null, hostname: null }
     }
     const ip = await this.getHotspotIp()
-    return { apMode: true, hotspotIp: ip }
+    return { apMode: true, hotspotIp: ip, hotspotSsid: getHotspotConName(), hostname: os.hostname() }
   }
 
   // Get the actual IP assigned to wlan0 in AP mode (falls back to default)
@@ -94,7 +103,7 @@ export class WifiService {
       const security = parts[parts.length - 2].trim() || 'Open'
       const ssid = parts.slice(1, parts.length - 2).join(':').trim()
 
-      if (!ssid || ssid === HOTSPOT_CON || seen.has(ssid)) continue
+      if (!ssid || ssid === getHotspotConName() || seen.has(ssid)) continue
       seen.add(ssid)
       networks.push({ ssid, security, signal, inUse })
     }
@@ -102,22 +111,46 @@ export class WifiService {
     return networks.sort((a, b) => b.signal - a.signal)
   }
 
-  // Connect wlan0 to a given network; uses sudo so it works from the pi user
+  // Connect wlan0 to a given network; uses sudo so it works from the pi user.
+  //
+  // Deliberately NOT `nmcli dev wifi connect <ssid> password <pwd>` — on
+  // current NetworkManager (nmcli 1.52+) that shorthand fails outright with
+  // "802-11-wireless-security.key-mgmt: property is missing", before it
+  // ever attempts to associate. Building the connection profile explicitly
+  // via `connection add` + `connection up` (same pattern as the hotspot
+  // creation in wifi-check.sh) sidesteps the broken shorthand entirely.
   async connect(ssid: string, password: string): Promise<void> {
     // Shell-escape single quotes in ssid/password
     const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`
+    const conName = ssid
 
-    const cmd = password
-      ? `sudo nmcli --wait 30 dev wifi connect ${q(ssid)} password ${q(password)} ifname wlan0`
-      : `sudo nmcli --wait 30 dev wifi connect ${q(ssid)} ifname wlan0`
+    // Drop any previous profile for this SSID so retries (or reconnecting
+    // to a network used before) don't pile up duplicate connections.
+    await execAsync(`sudo nmcli connection delete ${q(conName)} 2>/dev/null`).catch(() => {})
 
-    await execAsync(cmd)
+    const securityArgs = password
+      ? `802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk ${q(password)}`
+      : ''
+
+    await execAsync(
+      `sudo nmcli connection add type wifi ifname wlan0 con-name ${q(conName)} ssid ${q(ssid)} ${securityArgs} ipv4.method auto`
+    )
+
+    try {
+      await execAsync(`sudo nmcli --wait 30 connection up ${q(conName)}`)
+    } catch (err) {
+      // Failed to associate (wrong password, out of range, etc.) — remove
+      // the bad profile rather than leaving it behind for NM to retry.
+      await execAsync(`sudo nmcli connection delete ${q(conName)} 2>/dev/null`).catch(() => {})
+      throw err
+    }
   }
 
   // Tear down the hotspot connection created by wifi-check.sh
   async teardownHotspot(): Promise<void> {
-    await execAsync(`sudo nmcli connection down   "${HOTSPOT_CON}" 2>/dev/null`).catch(() => {})
-    await execAsync(`sudo nmcli connection delete "${HOTSPOT_CON}" 2>/dev/null`).catch(() => {})
+    const con = getHotspotConName()
+    await execAsync(`sudo nmcli connection down   "${con}" 2>/dev/null`).catch(() => {})
+    await execAsync(`sudo nmcli connection delete "${con}" 2>/dev/null`).catch(() => {})
     try { fs.unlinkSync(AP_MODE_FLAG) } catch { /* already gone */ }
   }
 
@@ -128,13 +161,22 @@ export class WifiService {
 
 // ── Setup page HTML (served at GET /setup) ────────────────────────────────────
 // Self-contained; no React bundle required. Works on any phone browser.
+// Built per-request (not a static const) so the displayed name always
+// matches this device's current hostname — a fresh unit shows its default
+// name, a renamed one shows the parent-chosen name, no rebuild needed.
 
-export const SETUP_PAGE_HTML = /* html */ `<!DOCTYPE html>
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+export function buildSetupPageHtml(): string {
+  const deviceName = escHtml(os.hostname())
+  return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leo's Clock — WiFi Setup</title>
+  <title>${deviceName} — WiFi Setup</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -244,7 +286,7 @@ export const SETUP_PAGE_HTML = /* html */ `<!DOCTYPE html>
 </head>
 <body>
   <div class="hero">⏰</div>
-  <h1>Leo's Clock</h1>
+  <h1>${deviceName}</h1>
   <p class="sub">WiFi Setup</p>
 
   <!-- Step 1: pick a network -->
@@ -378,3 +420,4 @@ export const SETUP_PAGE_HTML = /* html */ `<!DOCTYPE html>
 </body>
 </html>
 `
+}

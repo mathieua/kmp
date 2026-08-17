@@ -166,10 +166,21 @@ function App() {
 
   // WiFi AP mode
   useEffect(() => {
-    window.electronAPI.wifi.getStatus()
+    const check = () => window.electronAPI.wifi.getStatus()
       .then(s => setWifiApMode(s.apMode))
       .catch(() => {})
-    return window.electronAPI.wifi.onConnected(() => setWifiApMode(false))
+    check()
+    // Safety net: the systemd wifi check is supposed to finish (AP mode
+    // included) before the app ever launches, but if that ordering is ever
+    // broken (e.g. an older unit file still installed), don't get stuck
+    // showing the wrong screen for the rest of the session — keep polling
+    // for AP mode turning on. Cheap: a single fs.existsSync check.
+    const interval = setInterval(check, 5000)
+    const unsubscribe = window.electronAPI.wifi.onConnected(() => setWifiApMode(false))
+    return () => {
+      clearInterval(interval)
+      unsubscribe()
+    }
   }, [])
 
   // USB sync device

@@ -212,10 +212,10 @@ fi
 chmod +x ~/alarm-clock/scripts/wifi-check.sh
 
 # Install and enable the systemd service
-sudo cp ~/alarm-clock/scripts/leo-clock-wifi.service /etc/systemd/system/
+sudo cp ~/alarm-clock/scripts/wifi-check.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable leo-clock-wifi.service
-echo "leo-clock-wifi.service enabled."
+sudo systemctl enable wifi-check.service
+echo "wifi-check.service enabled."
 
 # Step 16: Verify I2C
 print_step "Verifying I2C configuration..."

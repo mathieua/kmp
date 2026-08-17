@@ -7,7 +7,7 @@ import * as fs from 'fs'
 import * as fsPromises from 'fs/promises'
 import { spawn, exec, ChildProcess } from 'child_process'
 import { promisify } from 'util'
-import { WifiService, SETUP_PAGE_HTML } from './wifi'
+import { WifiService, buildSetupPageHtml } from './wifi'
 import {
   initDatabase,
   getMediaItems,
@@ -419,10 +419,10 @@ export function createApiService(
 
   // ---- WiFi provisioning (only meaningful when Pi is in AP mode) ----
 
-  // Phone browser lands here after joining the leo-clock-setup hotspot
+  // Phone browser lands here after joining this device's <hostname>-setup hotspot
   app.get('/setup', (_req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
-    res.send(SETUP_PAGE_HTML)
+    res.send(buildSetupPageHtml())
   })
 
   // Redirect bare root to /setup when in AP mode so typing the IP is enough

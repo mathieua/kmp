@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react'
 
 // ── Displayed on the physical 7" screen when the Pi is in AP / setup mode ────
-// The parent joins the leo-clock-setup hotspot on their phone and visits the
-// URL shown here. Everything happens in the phone browser — this screen is
-// just a clear set of instructions.
+// The parent joins this device's own "<hostname>-setup" hotspot on their
+// phone and visits the URL shown here. Everything happens in the phone
+// browser — this screen is just a clear set of instructions. The SSID is
+// read from the main process rather than hardcoded, since it's derived
+// from whatever this device is currently named.
 
 export function WifiSetup() {
-  const [hotspotIp, setHotspotIp] = useState<string>('10.42.0.1')
-  const [dots, setDots]           = useState('.')
+  const [hotspotIp, setHotspotIp]     = useState<string>('10.42.0.1')
+  const [hotspotSsid, setHotspotSsid] = useState<string>('this device’s setup network')
+  const [hostname, setHostname]       = useState<string | null>(null)
+  const [dots, setDots]               = useState('.')
 
   useEffect(() => {
     window.electronAPI.wifi.getStatus().then(s => {
       if (s.hotspotIp) setHotspotIp(s.hotspotIp)
+      if (s.hotspotSsid) setHotspotSsid(s.hotspotSsid)
+      if (s.hostname) setHostname(s.hostname)
     }).catch(() => {})
   }, [])
 
@@ -22,7 +28,11 @@ export function WifiSetup() {
     return () => clearInterval(id)
   }, [])
 
-  const url = `http://${hotspotIp}:3000/setup`
+  // The hostname-based URL is friendlier and works fine on the hotspot's
+  // own network (avahi has no interface restrictions), but mDNS support on
+  // phone browsers isn't universal — the raw IP is the guaranteed fallback.
+  const friendlyUrl = hostname ? `http://${hostname}.local:3000/setup` : null
+  const ipUrl = `http://${hotspotIp}:3000/setup`
 
   return (
     <div className="wifi-setup">
@@ -35,14 +45,21 @@ export function WifiSetup() {
           <span className="wifi-setup__num">1</span>
           <span>
             On your phone, join the WiFi network{' '}
-            <strong className="wifi-setup__ssid">leo-clock-setup</strong>
+            <strong className="wifi-setup__ssid">{hotspotSsid}</strong>
           </span>
         </div>
         <div className="wifi-setup__step">
           <span className="wifi-setup__num">2</span>
           <span>
             Open your browser and go to{' '}
-            <strong className="wifi-setup__url">{url}</strong>
+            <strong className="wifi-setup__url">{friendlyUrl ?? ipUrl}</strong>
+            {friendlyUrl && (
+              <>
+                {' '}<span className="wifi-setup__url-fallback">
+                  (or {ipUrl} if that doesn’t load)
+                </span>
+              </>
+            )}
           </span>
         </div>
         <div className="wifi-setup__step">

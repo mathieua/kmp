@@ -56,6 +56,8 @@ export interface WifiNetwork {
 export interface WifiStatus {
   apMode: boolean
   hotspotIp: string | null
+  hotspotSsid: string | null
+  hostname: string | null
 }
 
 export interface Alarm {
