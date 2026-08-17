@@ -4,15 +4,22 @@ Rotary encoder daemon.
 
 Polls GPIO17 (CLK), GPIO27 (DT), GPIO22 (SW) every 1 ms and emits
 newline-delimited JSON events to every client connected on the Unix
-domain socket at /tmp/leo-encoder.sock.
+domain socket at /tmp/kmp-encoder.sock.
 
 Events:
     {"event": "volume_up"}
     {"event": "volume_down"}
     {"event": "mute_toggle"}
 
-Active LOW with internal pull-ups.
-CLK/DT: 5 ms software debounce. SW: 50 ms software debounce.
+Active LOW with internal pull-ups. SW: 50 ms software debounce.
+Rotation uses a 4-state quadrature state machine (the standard approach,
+e.g. Ben Buxton's "Rotary" table), not single-edge detection — sampling
+CLK+DT together on every poll and only emitting once a full, valid
+CW/CCW transition sequence completes. A naive "trigger on CLK falling
+edge, read DT's instantaneous value" decoder (the previous approach here)
+is well known to misfire on contact bounce, producing spurious
+opposite-direction events mid-turn — exactly the "goes up and down as I
+turn" symptom this replaces.
 Uses lgpio polling (gpio_read) — the lgpio callback/alert mechanism is
 unreliable on kernel 6.x and produces no events even with correct wiring.
 """
@@ -31,10 +38,9 @@ except ImportError:
     sys.stderr.write("lgpio not installed — run: sudo apt install python3-lgpio\n")
     sys.exit(1)
 
-SOCK_PATH    = "/tmp/leo-encoder.sock"
+SOCK_PATH    = "/tmp/kmp-encoder.sock"
 POLL_SLEEP   = 0.001   # 1 ms — fast enough for encoder, light on CPU
 SW_DEBOUNCE  = 0.050   # 50 ms for push button
-CLK_DEBOUNCE = 0.005   # 5 ms for encoder CLK
 
 PIN_CLK = 17
 PIN_DT  = 27
@@ -43,6 +49,34 @@ PIN_SW  = 22
 _clients: list[socket.socket] = []
 _clients_lock = threading.Lock()
 _running = True
+
+# ── Quadrature state machine ──────────────────────────────────────────────
+# States
+R_START, R_CW_FINAL, R_CW_BEGIN, R_CW_NEXT, R_CCW_BEGIN, R_CCW_FINAL, R_CCW_NEXT = range(7)
+# Direction flags, OR'd into the returned state
+DIR_CW  = 0x10
+DIR_CCW = 0x20
+
+# Row = current state, column = (CLK << 1) | DT (both active-high readings).
+# A direction is only reported when a full, valid CW or CCW sequence
+# completes (landing back on a "11" rest position) — any other/bouncy
+# sequence just moves between intermediate states without emitting anything.
+TTABLE = [
+    # R_START
+    [R_START,     R_CW_BEGIN,  R_CCW_BEGIN, R_START],
+    # R_CW_FINAL
+    [R_CW_NEXT,   R_START,     R_CW_FINAL,  R_START | DIR_CW],
+    # R_CW_BEGIN
+    [R_CW_NEXT,   R_CW_BEGIN,  R_START,     R_START],
+    # R_CW_NEXT
+    [R_CW_NEXT,   R_CW_BEGIN,  R_CW_FINAL,  R_START],
+    # R_CCW_BEGIN
+    [R_CCW_NEXT,  R_START,     R_CCW_BEGIN, R_START],
+    # R_CCW_FINAL
+    [R_CCW_NEXT,  R_CCW_FINAL, R_START,     R_START | DIR_CCW],
+    # R_CCW_NEXT
+    [R_CCW_NEXT,  R_CCW_FINAL, R_START,     R_CCW_BEGIN],
+]
 
 
 def broadcast(event: str) -> None:
@@ -59,20 +93,22 @@ def broadcast(event: str) -> None:
 
 
 def poll_loop(h: int) -> None:
-    """Detect CLK falling edges for rotation and SW falling edge for mute."""
-    last_clk = lgpio.gpio_read(h, PIN_CLK)
-    last_sw  = lgpio.gpio_read(h, PIN_SW)
+    """Run the quadrature state machine on CLK+DT, and detect SW falling edge for mute."""
+    state = R_START
+    last_sw = lgpio.gpio_read(h, PIN_SW)
 
     while _running:
         clk = lgpio.gpio_read(h, PIN_CLK)
+        dt  = lgpio.gpio_read(h, PIN_DT)
         sw  = lgpio.gpio_read(h, PIN_SW)
 
-        # Encoder rotation — falling edge on CLK
-        if clk == 0 and last_clk == 1:
-            time.sleep(CLK_DEBOUNCE)
-            if lgpio.gpio_read(h, PIN_CLK) == 0:   # still low — real edge
-                dt = lgpio.gpio_read(h, PIN_DT)
-                broadcast("volume_up" if dt == 1 else "volume_down")
+        pin_state = (clk << 1) | dt
+        state = TTABLE[state & 0x7][pin_state]
+        direction = state & 0x30
+        if direction == DIR_CW:
+            broadcast("volume_up")
+        elif direction == DIR_CCW:
+            broadcast("volume_down")
 
         # Push button — falling edge on SW
         if sw == 0 and last_sw == 1:
@@ -80,8 +116,7 @@ def poll_loop(h: int) -> None:
             if lgpio.gpio_read(h, PIN_SW) == 0:
                 broadcast("mute_toggle")
 
-        last_clk = clk
-        last_sw  = sw
+        last_sw = sw
         time.sleep(POLL_SLEEP)
 
 

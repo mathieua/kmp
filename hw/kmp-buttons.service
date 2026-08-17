@@ -1,9 +1,9 @@
 [Unit]
-Description=leo-clock physical buttons daemon
+Description=KMP physical buttons daemon
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /opt/leo-clock/hw/buttons.py
+ExecStart=/usr/bin/python3 /opt/kmp/hw/buttons.py
 Restart=always
 RestartSec=2
 User=pi

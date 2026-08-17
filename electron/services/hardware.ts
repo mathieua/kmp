@@ -1,13 +1,14 @@
 /**
- * Hardware integration service for leo-clock.
+ * Hardware integration service.
  *
  * Responsibilities:
- *  - Connect to the encoder daemon's Unix socket (/tmp/leo-encoder.sock)
- *    and the buttons daemon's Unix socket (/tmp/leo-buttons.sock).
+ *  - Connect to the encoder daemon's Unix socket (/tmp/kmp-encoder.sock)
+ *    and the buttons daemon's Unix socket (/tmp/kmp-buttons.sock).
  *  - Dispatch incoming hardware events to the audio/alarm services (never
  *    through the React renderer layer).
  *  - Spawn light_sensor.py as a child process and write screen brightness
- *    to /sys/class/backlight/10-0045/brightness (with 5% hysteresis).
+ *    to /sys/class/backlight/<panel>/brightness (with 5% hysteresis),
+ *    scaled to that backlight device's own max_brightness range.
  *  - Spawn led_control.py as a persistent child process and drive GPIO26
  *    (snooze LED) with a 500 ms flash loop while an alarm is firing.
  */
@@ -20,19 +21,41 @@ import * as readline from 'readline'
 import { AudioService } from './audio'
 import { AlarmService } from './alarm'
 
-const ENCODER_SOCK   = '/tmp/leo-encoder.sock'
-const BUTTONS_SOCK   = '/tmp/leo-buttons.sock'
-const BRIGHTNESS_PATH = '/sys/class/backlight/10-0045/brightness'
-const HW_DIR         = '/opt/leo-clock/hw'
-const HYSTERESIS     = 13  // > 5% of 255 — prevents flicker near thresholds
+const ENCODER_SOCK   = '/tmp/kmp-encoder.sock'
+const BUTTONS_SOCK   = '/tmp/kmp-buttons.sock'
+const BACKLIGHT_ROOT = '/sys/class/backlight'
+const HW_DIR         = '/opt/kmp/hw'
+const HYSTERESIS_PCT = 5  // percent — prevents flicker near thresholds
 
-/** Maps a lux reading to a 0-255 backlight raw value. */
-function luxToBrightness(lux: number): number {
-  if (lux < 10)  return 38   // 15% — dark room
-  if (lux < 50)  return 76   // 30% — dim
-  if (lux < 200) return 153  // 60% — normal indoor
-  if (lux < 500) return 204  // 80% — bright indoor
-  return 255                  // 100% — sunlight / near window
+/**
+ * Finds the backlight sysfs path and its max_brightness. Not hardcoded to a
+ * specific device name — the previous hardcoded "10-0045" (a leftover from
+ * a different kernel/panel-driver's numbering, coincidentally also the
+ * touch controller's I2C address on this one) silently pointed at a
+ * nonexistent path, so every brightness write failed and was swallowed by
+ * the catch block below. A max_brightness range (31 here) that isn't 255
+ * has bitten this exact project before too — scale by whatever the device
+ * actually reports rather than assuming a fixed range.
+ */
+function findBacklight(): { path: string; max: number } | null {
+  try {
+    const [device] = fs.readdirSync(BACKLIGHT_ROOT)
+    if (!device) return null
+    const dir = `${BACKLIGHT_ROOT}/${device}`
+    const max = parseInt(fs.readFileSync(`${dir}/max_brightness`, 'utf8').trim(), 10)
+    return { path: `${dir}/brightness`, max }
+  } catch {
+    return null
+  }
+}
+
+/** Maps a lux reading to a target brightness percentage (0-100). */
+function luxToBrightnessPct(lux: number): number {
+  if (lux < 10)  return 15   // dark room
+  if (lux < 50)  return 30   // dim
+  if (lux < 200) return 60   // normal indoor
+  if (lux < 500) return 80   // bright indoor
+  return 100                  // sunlight / near window
 }
 
 export class HardwareService {
@@ -43,11 +66,15 @@ export class HardwareService {
   private ledProc: ChildProcess | null = null
   private ledInterval: NodeJS.Timeout | null = null
   private ledState = false
-  private currentBrightness = -1
+  private currentBrightnessPct = -1
+  private backlight = findBacklight()
 
   constructor(audio: AudioService, alarm: AlarmService) {
     this.audio = audio
     this.alarm = alarm
+    if (!this.backlight) {
+      console.log('[light_sensor] no backlight device found under ' + BACKLIGHT_ROOT + ', skipping brightness control')
+    }
   }
 
   start(): void {
@@ -178,12 +205,15 @@ export class HardwareService {
   }
 
   private applyBrightness(lux: number): void {
-    const target = luxToBrightness(lux)
-    if (Math.abs(target - this.currentBrightness) <= HYSTERESIS) return
+    if (!this.backlight) return
+
+    const targetPct = luxToBrightnessPct(lux)
+    if (Math.abs(targetPct - this.currentBrightnessPct) <= HYSTERESIS_PCT) return
 
     try {
-      fs.writeFileSync(BRIGHTNESS_PATH, String(target))
-      this.currentBrightness = target
+      const raw = Math.round((targetPct / 100) * this.backlight.max)
+      fs.writeFileSync(this.backlight.path, String(raw))
+      this.currentBrightnessPct = targetPct
     } catch {
       // sysfs path absent in dev — ignore silently
     }

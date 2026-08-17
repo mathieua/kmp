@@ -4,7 +4,7 @@ Physical button daemon.
 
 Polls GPIO6 (play/pause), GPIO13 (skip), GPIO5 (previous), GPIO24 (snooze)
 every 5 ms and emits newline-delimited JSON events to every client connected
-on the Unix domain socket at /tmp/leo-buttons.sock.
+on the Unix domain socket at /tmp/kmp-buttons.sock.
 
 Events:
     {"event": "play_pause"}
@@ -31,7 +31,7 @@ except ImportError:
     sys.stderr.write("lgpio not installed — run: sudo apt install python3-lgpio\n")
     sys.exit(1)
 
-SOCK_PATH = "/tmp/leo-buttons.sock"
+SOCK_PATH = "/tmp/kmp-buttons.sock"
 POLL_HZ   = 200      # poll every 5 ms
 DEBOUNCE  = 0.050    # 50 ms software debounce
 

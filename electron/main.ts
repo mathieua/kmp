@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, net } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol, net, screen } from 'electron'
 import path from 'path'
 import { AudioService, Track } from './services/audio'
 import { AlarmService } from './services/alarm'
@@ -22,9 +22,19 @@ let alarmVolumeRampTimer: NodeJS.Timeout | null = null
 let alarmAutoDismissTimer: NodeJS.Timeout | null = null
 
 function createWindow() {
+  // `fullscreen`/`kiosk` are EWMH hints that rely on a window manager to
+  // enforce them. These kiosks run bare Xorg with no WM (see .xinitrc), so
+  // on displays other than the original 800x480 panel those flags are
+  // silently ignored and the window sits at its literal width/height,
+  // centered with black borders. Sizing explicitly from the real display
+  // bounds works regardless of whether a WM is present.
+  const { width, height } = isKiosk ? screen.getPrimaryDisplay().bounds : { width: 800, height: 480 }
+
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 480,
+    width,
+    height,
+    x: isKiosk ? 0 : undefined,
+    y: isKiosk ? 0 : undefined,
     fullscreen: isKiosk,
     frame: !isKiosk,
     kiosk: isKiosk,
@@ -255,6 +265,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   hardwareService?.stop()
   alarmService?.stop()
+  audioService?.destroy()
   if (process.platform !== 'darwin') {
     app.quit()
   }
