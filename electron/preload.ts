@@ -5,8 +5,11 @@ export interface Track {
   filename: string
   filepath: string
   title: string
+  artist?: string
+  album?: string
   artwork?: string
   duration?: number
+  loop?: boolean
 }
 
 export interface PlaybackState {
@@ -35,6 +38,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setQueue: (tracks: Track[], startIndex: number): void => {
       ipcRenderer.invoke('audio:setQueue', tracks, startIndex)
     },
+    seek: (seconds: number): Promise<void> => ipcRenderer.invoke('audio:seek', seconds),
     next: (): Promise<void> => ipcRenderer.invoke('audio:next'),
     previous: (): Promise<void> => ipcRenderer.invoke('audio:previous'),
 
@@ -55,6 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   alarm: {
     getAlarm: () => ipcRenderer.invoke('alarm:getAlarm'),
     setAlarm: (time: string, enabled: boolean, soundPath?: string | null) => ipcRenderer.invoke('alarm:setAlarm', time, enabled, soundPath),
+    listSounds: () => ipcRenderer.invoke('alarm:listSounds'),
     snooze: () => ipcRenderer.invoke('alarm:snooze'),
     dismiss: () => ipcRenderer.invoke('alarm:dismiss'),
     onFired: (callback: () => void) => {
@@ -74,14 +79,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
+  // Persistent settings the main process also needs (alarm volume)
+  settings: {
+    getDefaultVolume: (): Promise<number> => ipcRenderer.invoke('settings:getDefaultVolume'),
+    setDefaultVolume: (volume: number): Promise<number> => ipcRenderer.invoke('settings:setDefaultVolume', volume),
+  },
+
   // WiFi provisioning
   wifi: {
     getStatus: () => ipcRenderer.invoke('wifi:getStatus'),
+    scanNetworks: () => ipcRenderer.invoke('wifi:scanNetworks'),
+    connect: (ssid: string, password: string) => ipcRenderer.invoke('wifi:connect', ssid, password),
     onConnected: (callback: () => void) => {
       const listener = () => callback()
       ipcRenderer.on('wifi:connected', listener)
       return () => ipcRenderer.removeListener('wifi:connected', listener)
     },
+  },
+
+  // Device identity / OOBE
+  device: {
+    getHostname: () => ipcRenderer.invoke('device:getHostname'),
+    isOnboarded: () => ipcRenderer.invoke('device:isOnboarded'),
+    validateHostname: (name: string) => ipcRenderer.invoke('device:validateHostname', name),
+    setHostname: (name: string) => ipcRenderer.invoke('device:setHostname', name),
   },
 
   // Sync controls

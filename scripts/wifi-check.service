@@ -13,7 +13,9 @@ Before=multi-user.target getty@tty1.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/home/pi/alarm-clock/scripts/wifi-check.sh
+# Invoked via bash so a missing exec bit (rsync/git can drop it) can't
+# silently disable the AP fallback — it did once: status=203/EXEC.
+ExecStart=/bin/bash /home/pi/alarm-clock/scripts/wifi-check.sh
 
 [Install]
 WantedBy=multi-user.target

@@ -28,7 +28,22 @@
           snooze: () => Promise.resolve(), dismiss: () => Promise.resolve(),
           onFired: () => () => {}, onDismissed: () => () => {}, onUpdated: () => () => {},
         },
-        wifi: { getStatus: () => Promise.resolve({ apMode: false, hotspotIp: null }), onConnected: () => () => {} },
+        wifi: {
+          getStatus: () => Promise.resolve({ apMode: false, hotspotIp: null, hotspotSsid: null, hostname: null }),
+          scanNetworks: () => Promise.resolve([
+            { ssid: 'Livebox-5BD0', security: 'WPA2', signal: 72, inUse: true },
+            { ssid: 'Neighbor WiFi', security: 'WPA2', signal: 40, inUse: false },
+            { ssid: 'Open Guest Network', security: 'Open', signal: 25, inUse: false },
+          ]),
+          connect: () => Promise.resolve(),
+          onConnected: () => () => {},
+        },
+        device: {
+          getHostname: () => Promise.resolve('kmp-bedside'),
+          isOnboarded: () => Promise.resolve(true),
+          validateHostname: () => Promise.resolve(null),
+          setHostname: () => Promise.resolve(),
+        },
         sync: { getDevice: () => Promise.resolve(null), getDiff: () => Promise.resolve({ toCopy: [], toSkip: [], orphans: [] }), startSync: () => Promise.resolve(), eject: () => Promise.resolve(), onEvent: () => () => {} },
       };
     }

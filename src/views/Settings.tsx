@@ -1,5 +1,8 @@
-import { Palette, Lang, Route, t, PALETTES, CORNER_RADIUS, AppSettings } from '../App'
-import { CircleBtn, IconBack } from '../components/Icons'
+import { useState, useEffect } from 'react'
+import { Palette, Lang, Route, t, PALETTES, AppSettings } from '../App'
+import { ScreenHeader } from '../components/ScreenHeader'
+import { HeaderActions } from '../components/HeaderActions'
+import { Slider } from '../components/Slider'
 
 interface SettingsProps {
   palette: Palette
@@ -7,10 +10,50 @@ interface SettingsProps {
   settings: AppSettings
   onSettings: (s: AppSettings) => void
   onNavigate: (r: Route) => void
+  onBack: () => void
+  onRenameDevice: () => void
 }
 
-export function Settings({ palette, lang, settings, onSettings, onNavigate }: SettingsProps) {
-  const r = CORNER_RADIUS
+// Defined at module level (not inside Settings): a component declared inside
+// another is a new type every render, so React would remount its children —
+// which would cancel an in-progress slider drag.
+function Row({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.15)',
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255,255,255,0.18)',
+      borderRadius: 'var(--r)', padding: 'var(--gap)', flexShrink: 0,
+    }}>
+      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 'var(--fs-sm)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 'var(--gap-sm)' }}>
+        {title}
+      </div>
+      <div style={{ display: 'flex', gap: 'var(--gap-xs)', flexWrap: 'wrap', alignItems: 'center' }}>{children}</div>
+      {hint && (
+        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 'var(--fs-sm)', marginTop: 'var(--gap-sm)' }}>{hint}</div>
+      )}
+    </div>
+  )
+}
+
+function Chip({ active, accent, onClick, children }: { active: boolean; accent: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: 'var(--gap-sm) var(--gap)', borderRadius: 999, border: 'none',
+      fontWeight: 800, fontSize: 'var(--fs-body)', cursor: 'pointer', fontFamily: 'inherit',
+      background: active ? '#fff' : 'rgba(255,255,255,0.18)',
+      color: active ? accent : '#fff',
+      transition: 'background 0.15s, color 0.15s',
+    }}>{children}</button>
+  )
+}
+
+export function Settings({ palette, lang, settings, onSettings, onNavigate, onBack, onRenameDevice }: SettingsProps) {
+  const [defaultVolume, setDefaultVolume] = useState<number | null>(null)
+
+  useEffect(() => {
+    window.electronAPI.settings.getDefaultVolume().then(setDefaultVolume).catch(() => setDefaultVolume(50))
+  }, [])
 
   const set = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     onSettings({ ...settings, [key]: value })
@@ -23,59 +66,54 @@ export function Settings({ palette, lang, settings, onSettings, onNavigate }: Se
     { v: 180, label: '3 min' },
   ]
 
-  const Row = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div style={{
-      background: 'rgba(255,255,255,0.15)',
-      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      border: '1px solid rgba(255,255,255,0.18)',
-      borderRadius: 'var(--r)', padding: 'var(--gap)', flexShrink: 0,
-    }}>
-      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 'var(--fs-sm)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 'var(--gap-sm)' }}>
-        {title}
-      </div>
-      <div style={{ display: 'flex', gap: 'var(--gap-xs)', flexWrap: 'wrap' }}>{children}</div>
-    </div>
-  )
-
-  const Chip = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
-    <button onClick={onClick} style={{
-      padding: 'var(--gap-sm) var(--gap)', borderRadius: 999, border: 'none',
-      fontWeight: 800, fontSize: 'var(--fs-body)', cursor: 'pointer', fontFamily: 'inherit',
-      background: active ? '#fff' : 'rgba(255,255,255,0.18)',
-      color: active ? palette.accentPlay : '#fff',
-      transition: 'background 0.15s, color 0.15s',
-    }}>{children}</button>
-  )
-
   return (
     <div style={{
       width: '100%', height: '100%', background: palette.clock,
       display: 'flex', flexDirection: 'column', padding: 'var(--pad)', gap: 'var(--gap)', overflow: 'hidden',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <CircleBtn onClick={() => onNavigate('clock')}><IconBack size="var(--icon)" /></CircleBtn>
-        <h1 style={{ color: '#fff', fontSize: 'var(--fs-h1)', fontWeight: 800, margin: 0 }}>{t(lang, 'settings')}</h1>
-        <div style={{ width: 'var(--btn)' }} />
-      </div>
+      <ScreenHeader
+        title={t(lang, 'settings')}
+        onBack={onBack}
+        right={<HeaderActions onNavigate={onNavigate} showSettings={false} />}
+      />
 
       {/* Rows */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--gap-sm)', overflowY: 'auto' }}>
+        <Row title={t(lang, 'defaultVolume')} hint={t(lang, 'defaultVolumeHint')}>
+          {defaultVolume !== null && (
+            <>
+              <Slider
+                value={defaultVolume}
+                onChange={setDefaultVolume}
+                onCommit={v => window.electronAPI.settings.setDefaultVolume(Math.round(v)).then(setDefaultVolume)}
+                label={t(lang, 'defaultVolume')}
+              />
+              <div style={{ minWidth: '3.2em', textAlign: 'right', color: '#fff', fontWeight: 800, fontSize: 'var(--fs-h3)', fontVariantNumeric: 'tabular-nums' }}>
+                {Math.round(defaultVolume)}%
+              </div>
+            </>
+          )}
+        </Row>
+
         <Row title={t(lang, 'language')}>
-          <Chip active={settings.lang === 'en'} onClick={() => set('lang', 'en')}>English</Chip>
-          <Chip active={settings.lang === 'fr'} onClick={() => set('lang', 'fr')}>Français</Chip>
+          <Chip accent={palette.accentPlay} active={settings.lang === 'en'} onClick={() => set('lang', 'en')}>English</Chip>
+          <Chip accent={palette.accentPlay} active={settings.lang === 'fr'} onClick={() => set('lang', 'fr')}>Français</Chip>
         </Row>
 
         <Row title={t(lang, 'theme')}>
           {(Object.keys(PALETTES) as Array<keyof typeof PALETTES>).map(name => (
-            <Chip key={name} active={settings.theme === name} onClick={() => set('theme', name)}>{name}</Chip>
+            <Chip accent={palette.accentPlay} key={name} active={settings.theme === name} onClick={() => set('theme', name)}>{name}</Chip>
           ))}
         </Row>
 
         <Row title={t(lang, 'autoDim')}>
           {dimOptions.map(o => (
-            <Chip key={o.v} active={settings.dimSeconds === o.v} onClick={() => set('dimSeconds', o.v)}>{o.label}</Chip>
+            <Chip accent={palette.accentPlay} key={o.v} active={settings.dimSeconds === o.v} onClick={() => set('dimSeconds', o.v)}>{o.label}</Chip>
           ))}
+        </Row>
+
+        <Row title={t(lang, 'device')}>
+          <Chip accent={palette.accentPlay} active={false} onClick={onRenameDevice}>{t(lang, 'renameDevice')}</Chip>
         </Row>
       </div>
     </div>

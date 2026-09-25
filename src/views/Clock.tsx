@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Palette, Lang, Route, t, DATE_LABELS, CORNER_RADIUS } from '../App'
+import { Palette, Lang, Route, t, DATE_LABELS } from '../App'
 import { Alarm, Track } from '../types'
-import { CircleBtn, IconAlarm, IconMusic, IconPlay, IconPause, IconSettings } from '../components/Icons'
+import { CircleBtn, IconAlarm, IconMusic, IconPlay, IconPause } from '../components/Icons'
+import { HeaderActions } from '../components/HeaderActions'
 
 interface ClockProps {
   palette: Palette
@@ -24,7 +25,6 @@ export function Clock({ palette, lang, alarm, isPlaying, currentTrack, onToggleP
   const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
   const labels = DATE_LABELS[lang] ?? DATE_LABELS.en
   const dateStr = labels.fmt(now, labels.days, labels.months)
-  const r = CORNER_RADIUS
 
   const cardBase: React.CSSProperties = {
     flex: 1, background: 'rgba(255,255,255,0.22)',
@@ -45,20 +45,10 @@ export function Clock({ palette, lang, alarm, isPlaying, currentTrack, onToggleP
       display: 'flex', flexDirection: 'column', padding: 'var(--pad)', gap: 'var(--pad)',
       position: 'relative', overflow: 'hidden',
     }}>
-      {/* Settings gear — top right */}
-      <button onClick={() => onNavigate('settings')} style={{
-        position: 'absolute', top: 'var(--gap)', right: 'var(--gap)',
-        width: 'var(--btn-sm)', height: 'var(--btn-sm)', borderRadius: '50%',
-        background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', padding: 0, zIndex: 2, transition: 'transform 0.12s ease',
-      }}
-        onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.93)')}
-        onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
-        onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
-      >
-        <IconSettings size="var(--icon)" />
-      </button>
+      {/* Volume + settings — top right */}
+      <div style={{ position: 'absolute', top: 'var(--gap)', right: 'var(--gap)', zIndex: 2 }}>
+        <HeaderActions onNavigate={onNavigate} />
+      </div>
 
       {/* Time + date */}
       <div style={{
@@ -104,7 +94,7 @@ export function Clock({ palette, lang, alarm, isPlaying, currentTrack, onToggleP
         </div>
 
         {/* Music card */}
-        <div onClick={() => onNavigate('playlists')} style={cardBase}
+        <div onClick={() => onNavigate(isPlaying && currentTrack ? 'player' : 'library')} style={cardBase}
           onMouseDown={e => ((e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.30)')}
           onMouseUp={e => ((e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.22)')}
           onMouseLeave={e => ((e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.22)')}

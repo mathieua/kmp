@@ -5,7 +5,8 @@
 # must finish, AP mode included, before the app takes its first look at
 # /tmp/wifi-ap-mode).
 #
-# Waits up to 30s for any WiFi connection.
+# Waits up to 30s for any WiFi connection (up to 90s if NM is still mid-connect,
+# e.g. waiting on a slow DHCP reply).
 # If none, creates an open "<hostname>-setup" hotspot and writes
 # /tmp/wifi-ap-mode so the Electron app can enter setup UI.
 #
@@ -19,6 +20,7 @@ HOTSPOT_SSID="$(hostname)-setup"
 HOTSPOT_CON="$(hostname)-setup"
 FLAG_FILE="/tmp/wifi-ap-mode"
 MAX_WAIT=30
+MAX_WAIT_CONNECTING=90
 INTERVAL=5
 
 log() {
@@ -53,17 +55,32 @@ rm -f "$FLAG_FILE"
 # on every boot from then on with no way back into the setup flow.
 nmcli connection delete "$HOTSPOT_CON" 2>/dev/null || true
 
+is_connecting() {
+    # wlan0 has associated (or is trying to) and NM is still working on it
+    # — e.g. "connecting (getting IP configuration)". A slow DHCP reply
+    # after boot can take well over MAX_WAIT; giving up then tears down a
+    # perfectly good connection and drops into AP mode for no reason.
+    nmcli -t -f DEVICE,STATE device status 2>/dev/null | awk -F: '$1 == "wlan0" && $2 ~ /^connecting/ { found=1 } END { exit !found }'
+}
+
 # ── Wait for connection ────────────────────────────────────────────────────────
 log "Waiting up to ${MAX_WAIT}s for WiFi..."
 elapsed=0
-while [ "$elapsed" -lt "$MAX_WAIT" ]; do
+while true; do
     if is_connected; then
         log "WiFi connected — normal boot."
         exit 0
     fi
+    if [ "$elapsed" -ge "$MAX_WAIT" ]; then
+        # Past the normal limit: only keep going while NM is mid-connect
+        # (bounded — NM's own DHCP timeout is 45s), otherwise fall back.
+        if [ "$elapsed" -ge "$MAX_WAIT_CONNECTING" ] || ! is_connecting; then
+            break
+        fi
+    fi
     sleep "$INTERVAL"
     elapsed=$((elapsed + INTERVAL))
-    log "No connection yet (${elapsed}s / ${MAX_WAIT}s)..."
+    log "No connection yet (${elapsed}s)..."
 done
 
 # ── No WiFi — create hotspot ───────────────────────────────────────────────────

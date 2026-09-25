@@ -167,13 +167,18 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--gap);
-  padding: var(--pad);
+  gap: var(--gap-sm);
+  padding: var(--gap) var(--pad);
   text-align: center;
+  /* Safety net: when a screen's content (e.g. the on-screen keyboard) is
+     taller than the viewport, scroll rather than silently clip — centered
+     overflow with hidden ancestors clips symmetrically top+bottom with no
+     visible sign anything is missing. */
+  overflow-y: auto;
 }
 
 .wifi-setup__icon {
-  font-size: var(--fs-dim);
+  font-size: var(--fs-xl);
   line-height: 1;
   margin-bottom: var(--gap-sm);
 }
@@ -236,4 +241,89 @@ button {
   color: #8899aa;
   font-size: var(--fs-sm);
   font-weight: 400;
+}
+
+.wifi-setup__phone-toggle {
+  margin-top: var(--gap);
+  background: none;
+  border: none;
+  color: #8899aa;
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.wifi-setup__phone-panel {
+  margin-top: var(--gap-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.wifi-setup__qr {
+  width: min(30vw, 40vh);
+  height: min(30vw, 40vh);
+  border-radius: var(--r-xs);
+  background: #fff;
+  padding: var(--gap-xs);
+}
+
+/* ── On-screen keyboard ───────────────────────────────────────────────────── */
+.kbd {
+  display: flex;
+  flex-direction: column;
+  gap: min(0.5vw, 0.83vh);
+  width: 100%;
+}
+
+.kbd__row {
+  display: flex;
+  gap: var(--gap-xs);
+  justify-content: center;
+}
+
+.kbd__key {
+  flex: 1;
+  min-width: 0;
+  max-width: var(--btn-lg);
+  height: var(--btn-sm);
+  border: none;
+  border-radius: var(--r-xs);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.05s;
+}
+
+.kbd__key:active {
+  background: rgba(255, 255, 255, 0.28);
+  transform: scale(0.95);
+}
+
+.kbd--compact .kbd__key {
+  height: min(4.75vw, 7.9vh);
+}
+
+.kbd__key--active {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.kbd__key--wide {
+  flex: 1.6;
+  font-size: var(--fs-sm);
+}
+
+.kbd__key--space {
+  flex: 4;
+}
+
+.kbd__key--done {
+  background: #e94560;
+}
+
+.kbd__key--done:active {
+  background: #c73a51;
 }

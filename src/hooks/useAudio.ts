@@ -6,92 +6,64 @@ const initialState: PlaybackState = {
   currentTrack: null,
   position: 0,
   duration: 0,
-  volume: 70,
+  volume: 50,
   queue: [],
   queueIndex: -1,
 }
 
-export function useAudio() {
-  const [state, setState] = useState<PlaybackState>(initialState)
-  const [tracks, setTracks] = useState<Track[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+// ── Library: scanned once, shared by every screen ──────────────────────────
+// Cached at module level so navigating between screens shows the list
+// instantly; each mount still refreshes in the background (the main process
+// caches ffprobe results, so this is cheap).
+let libraryCache: Track[] | null = null
+const libraryListeners = new Set<(tracks: Track[]) => void>()
+
+async function refreshLibrary(): Promise<void> {
+  libraryCache = await window.electronAPI.audio.scanMedia()
+  libraryListeners.forEach(l => l(libraryCache!))
+}
+
+export function useLibrary() {
+  const [tracks, setTracks] = useState<Track[]>(libraryCache ?? [])
+  const [isLoading, setIsLoading] = useState(libraryCache === null)
 
   useEffect(() => {
-    // Get initial state
+    libraryListeners.add(setTracks)
+    refreshLibrary().catch(console.error).finally(() => setIsLoading(false))
+    return () => { libraryListeners.delete(setTracks) }
+  }, [])
+
+  return { tracks, isLoading, rescan: refreshLibrary }
+}
+
+// ── Playback: live state + controls, no library scan ───────────────────────
+export function usePlayback() {
+  const [state, setState] = useState<PlaybackState>(initialState)
+
+  useEffect(() => {
     window.electronAPI.audio.getState().then(setState)
-
-    // Scan for media files
-    window.electronAPI.audio.scanMedia().then((scannedTracks) => {
-      setTracks(scannedTracks)
-      setIsLoading(false)
-    })
-
-    // Subscribe to state changes
-    const unsubscribe = window.electronAPI.audio.onStateChange((newState) => {
-      setState(newState)
-    })
-
-    return unsubscribe
+    return window.electronAPI.audio.onStateChange(setState)
   }, [])
 
-  const play = useCallback((track?: Track) => {
-    return window.electronAPI.audio.play(track)
+  const togglePlayPause = useCallback(() => window.electronAPI.audio.togglePlayPause(), [])
+  const setVolume = useCallback((volume: number) => window.electronAPI.audio.setVolume(volume), [])
+  const next = useCallback(() => window.electronAPI.audio.next(), [])
+  const previous = useCallback(() => window.electronAPI.audio.previous(), [])
+  const seek = useCallback((seconds: number) => window.electronAPI.audio.seek(seconds), [])
+
+  /** Plays `track`, with `queue` (in order) as what follows it. */
+  const playFrom = useCallback((queue: Track[], track: Track) => {
+    const index = queue.findIndex(t => t.id === track.id)
+    window.electronAPI.audio.setQueue(queue, index >= 0 ? index : 0)
   }, [])
 
-  const pause = useCallback(() => {
-    return window.electronAPI.audio.pause()
-  }, [])
+  return { ...state, togglePlayPause, setVolume, next, previous, seek, playFrom }
+}
 
-  const resume = useCallback(() => {
-    return window.electronAPI.audio.resume()
-  }, [])
-
-  const togglePlayPause = useCallback(() => {
-    return window.electronAPI.audio.togglePlayPause()
-  }, [])
-
-  const stop = useCallback(() => {
-    return window.electronAPI.audio.stop()
-  }, [])
-
-  const setVolume = useCallback((volume: number) => {
-    return window.electronAPI.audio.setVolume(volume)
-  }, [])
-
-  const playTrack = useCallback((track: Track) => {
-    // Set up queue with all tracks, starting at the selected one
-    const index = tracks.findIndex((t) => t.id === track.id)
-    window.electronAPI.audio.setQueue(tracks, index >= 0 ? index : 0)
-  }, [tracks])
-
-  const next = useCallback(() => {
-    return window.electronAPI.audio.next()
-  }, [])
-
-  const previous = useCallback(() => {
-    return window.electronAPI.audio.previous()
-  }, [])
-
-  const rescan = useCallback(async () => {
-    setIsLoading(true)
-    const scannedTracks = await window.electronAPI.audio.scanMedia()
-    setTracks(scannedTracks)
-    setIsLoading(false)
-  }, [])
-
-  return {
-    ...state,
-    tracks,
-    isLoading,
-    play,
-    pause,
-    resume,
-    togglePlayPause,
-    stop,
-    setVolume,
-    playTrack,
-    next,
-    previous,
-    rescan,
-  }
+/** Playback + the full library (kept for views that need both). */
+export function useAudio() {
+  const playback = usePlayback()
+  const { tracks, isLoading, rescan } = useLibrary()
+  const playTrack = useCallback((track: Track) => playback.playFrom(tracks, track), [playback.playFrom, tracks])
+  return { ...playback, tracks, isLoading, rescan, playTrack }
 }

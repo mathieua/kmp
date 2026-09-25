@@ -3,8 +3,11 @@ export interface Track {
   filename: string
   filepath: string
   title: string
+  artist?: string
+  album?: string
   artwork?: string
   duration?: number
+  loop?: boolean
 }
 
 export interface PlaybackState {
@@ -73,9 +76,18 @@ export interface ElectronAPI {
   platform: string
   wifi: {
     getStatus: () => Promise<WifiStatus>
+    scanNetworks: () => Promise<WifiNetwork[]>
+    connect: (ssid: string, password: string) => Promise<void>
     onConnected: (callback: () => void) => () => void
   }
+  device: {
+    getHostname: () => Promise<string>
+    isOnboarded: () => Promise<boolean>
+    validateHostname: (name: string) => Promise<string | null>
+    setHostname: (name: string) => Promise<void>
+  }
   alarm: {
+    listSounds: () => Promise<Track[]>
     getAlarm: () => Promise<Alarm | null>
     setAlarm: (time: string, enabled: boolean, soundPath?: string | null) => Promise<Alarm>
     snooze: () => Promise<void>
@@ -94,10 +106,15 @@ export interface ElectronAPI {
     stop: () => Promise<void>
     setVolume: (volume: number) => Promise<void>
     setQueue: (tracks: Track[], startIndex: number) => void
+    seek: (seconds: number) => Promise<void>
     next: () => Promise<void>
     previous: () => Promise<void>
     onStateChange: (callback: (state: PlaybackState) => void) => () => void
     onTrackEnded: (callback: () => void) => () => void
+  }
+  settings: {
+    getDefaultVolume: () => Promise<number>
+    setDefaultVolume: (volume: number) => Promise<number>
   }
   sync: {
     getDevice: () => Promise<UsbDevice | null>

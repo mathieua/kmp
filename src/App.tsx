@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Clock } from './views/Clock'
 import { Alarms } from './views/Alarms'
-import { Playlists } from './views/Playlists'
+import { Library } from './views/Library'
 import { MusicPlayer } from './views/MusicPlayer'
 import { Settings } from './views/Settings'
 import { DimmedClock } from './views/DimmedClock'
 import { WifiSetup } from './views/WifiSetup'
+import { Onboarding } from './views/Onboarding'
 import { useAlarm } from './hooks/useAlarm'
-import { useAudio } from './hooks/useAudio'
+import { usePlayback } from './hooks/useAudio'
 import './styles/global.css'
 import './types'
 
@@ -63,6 +64,17 @@ export const STRINGS = {
     songs: 'songs', language: 'Language', theme: 'Theme', autoDim: 'Auto dim',
     seconds: 's', never: 'Never', tapToWake: 'Tap anywhere to wake',
     myMusic: 'My Music', allTracks: 'Your tracks',
+    device: 'Device', renameDevice: 'Rename this clock',
+    song: 'song', artists: 'Artists', albums: 'Albums', search: 'Search', allPlaylist: 'All',
+    unknownArtist: 'Unknown artist', singles: 'Singles',
+    searchHint: 'Tap to type a song, artist or album', noResults: 'Nothing found',
+    noMusic: 'No music yet', addMusicHint: 'Add music via the parent portal',
+    done: 'Done', volume: 'Volume',
+    defaultVolume: 'Default volume',
+    defaultVolumeHint: 'Starting volume, and the loudest the alarm gets',
+    sound: 'Alarm sound', randomSong: 'Random song', alarmSounds: 'Alarm sounds',
+    yourSongs: 'Songs', tapToChange: 'Tap to change', playMusic: 'Play music',
+    snd_beep: 'Beep Beep', snd_chime: 'Morning Chime', snd_bird: 'Little Bird', snd_musicbox: 'Music Box',
   },
   fr: {
     alarms: 'Alarmes', music: 'Lecteur', playlists: 'Playlists',
@@ -73,6 +85,17 @@ export const STRINGS = {
     songs: 'titres', language: 'Langue', theme: 'Thème', autoDim: 'Mise en veille',
     seconds: 's', never: 'Jamais', tapToWake: 'Touchez pour réveiller',
     myMusic: 'Ma Musique', allTracks: 'Vos pistes',
+    device: 'Appareil', renameDevice: 'Renommer cette horloge',
+    song: 'titre', artists: 'Artistes', albums: 'Albums', search: 'Rechercher', allPlaylist: 'Tout',
+    unknownArtist: 'Artiste inconnu', singles: 'Titres seuls',
+    searchHint: 'Touchez pour chercher un titre, artiste ou album', noResults: 'Aucun résultat',
+    noMusic: 'Pas encore de musique', addMusicHint: 'Ajoutez de la musique via le portail parents',
+    done: 'OK', volume: 'Volume',
+    defaultVolume: 'Volume par défaut',
+    defaultVolumeHint: 'Volume de départ, et le maximum de l\'alarme',
+    sound: 'Son de l\'alarme', randomSong: 'Chanson au hasard', alarmSounds: 'Sons d\'alarme',
+    yourSongs: 'Chansons', tapToChange: 'Touchez pour changer', playMusic: 'Lire de la musique',
+    snd_beep: 'Bip Bip', snd_chime: 'Carillon du matin', snd_bird: 'Petit oiseau', snd_musicbox: 'Boîte à musique',
   },
 } as const
 export type Lang = keyof typeof STRINGS
@@ -124,7 +147,7 @@ function Stage({ children }: { children: React.ReactNode }) {
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
-export type Route = 'clock' | 'alarms' | 'playlists' | 'music' | 'settings'
+export type Route = 'clock' | 'alarms' | 'library' | 'player' | 'settings'
 
 // ── App ────────────────────────────────────────────────────────────────────
 function App() {
@@ -132,11 +155,15 @@ function App() {
   const [settings, setSettingsState] = useState<AppSettings>(loadSettings)
   const [dimmed, setDimmed] = useState(false)
   const [wifiApMode, setWifiApMode] = useState(false)
+  const [onboarded, setOnboarded] = useState<boolean | null>(null)
+  const [renameRequested, setRenameRequested] = useState(false)
   const [hasUsbDevice, setHasUsbDevice] = useState(false)
+  // Settings is reachable from every screen, so "back" returns to wherever it was opened from.
+  const [returnRoute, setReturnRoute] = useState<Route>('clock')
   const dimTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const { alarm, isFiring, snooze, dismiss } = useAlarm()
-  const { isPlaying, currentTrack, togglePlayPause } = useAudio()
+  const { isPlaying, currentTrack, togglePlayPause } = usePlayback()
 
   const palette = PALETTES[settings.theme] ?? PALETTES.Sunset
   const lang = settings.lang
@@ -163,6 +190,13 @@ function App() {
       clearInterval(interval)
       unsubscribe()
     }
+  }, [])
+
+  // First-boot naming (OOBE) — checked once; flips true directly via the
+  // Onboarding screen's onDone callback rather than re-polling, since
+  // nothing external changes this the way AP mode can.
+  useEffect(() => {
+    window.electronAPI.device.isOnboarded().then(setOnboarded).catch(() => setOnboarded(true))
   }, [])
 
   // USB sync device
@@ -201,12 +235,28 @@ function App() {
   const wake = useCallback(() => setDimmed(false), [])
 
   const navigate = useCallback((r: Route) => {
+    if (r === 'settings') setReturnRoute(cur => (route === 'settings' ? cur : route))
     setRoute(r)
     setDimmed(false)
-  }, [])
+  }, [route])
 
   if (wifiApMode) {
     return <Stage><WifiSetup /></Stage>
+  }
+
+  if (onboarded === false) {
+    return <Stage><Onboarding onDone={() => setOnboarded(true)} /></Stage>
+  }
+
+  if (renameRequested) {
+    return (
+      <Stage>
+        <Onboarding
+          onDone={() => setRenameRequested(false)}
+          onCancel={() => setRenameRequested(false)}
+        />
+      </Stage>
+    )
   }
 
   return (
@@ -239,14 +289,14 @@ function App() {
               onNavigate={navigate}
             />
           )}
-          {route === 'playlists' && (
-            <Playlists
+          {route === 'library' && (
+            <Library
               palette={palette}
               lang={lang}
               onNavigate={navigate}
             />
           )}
-          {route === 'music' && (
+          {route === 'player' && (
             <MusicPlayer
               palette={palette}
               lang={lang}
@@ -260,6 +310,8 @@ function App() {
               settings={settings}
               onSettings={updateSettings}
               onNavigate={navigate}
+              onBack={() => navigate(returnRoute)}
+              onRenameDevice={() => setRenameRequested(true)}
             />
           )}
         </>

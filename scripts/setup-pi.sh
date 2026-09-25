@@ -198,15 +198,19 @@ fi
 # Step 15: Install WiFi provisioning service
 print_step "Installing WiFi provisioning service..."
 
-# Allow the pi user to run nmcli and reboot without a password.
-# nmcli is needed to connect to WiFi and tear down the setup hotspot;
-# reboot is needed after a successful setup-mode reconfiguration.
+# Allow the pi user to run nmcli, reboot, and the hostname-rename script
+# without a password. nmcli is needed to connect to WiFi and tear down the
+# setup hotspot; reboot is needed after a successful setup-mode
+# reconfiguration or a device rename; set-hostname.sh is scoped to just
+# "rename this device" rather than granting broad file-editing sudo access.
 SUDOERS_FILE="/etc/sudoers.d/alarm-clock"
-if ! sudo grep -q "nmcli" "$SUDOERS_FILE" 2>/dev/null; then
-    echo "pi ALL=(ALL) NOPASSWD: /usr/bin/nmcli, /sbin/reboot" | sudo tee "$SUDOERS_FILE" > /dev/null
+if ! sudo grep -q "set-hostname.sh" "$SUDOERS_FILE" 2>/dev/null; then
+    echo "pi ALL=(ALL) NOPASSWD: /usr/bin/nmcli, /sbin/reboot, /home/pi/alarm-clock/scripts/set-hostname.sh" | sudo tee "$SUDOERS_FILE" > /dev/null
     sudo chmod 440 "$SUDOERS_FILE"
     echo "Sudoers entry written to $SUDOERS_FILE"
 fi
+
+chmod +x ~/alarm-clock/scripts/set-hostname.sh
 
 # Make the check script executable
 chmod +x ~/alarm-clock/scripts/wifi-check.sh

@@ -93,6 +93,40 @@ export const IconSettings = (p: IconProps) => (
   </Icon>
 )
 
+export const IconVolume = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M11 5 6 9H2v6h4l5 4z"/>
+    <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+    <path d="M19 5a10 10 0 0 1 0 14"/>
+  </Icon>
+)
+
+export const IconVolumeMute = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M11 5 6 9H2v6h4l5 4z"/>
+    <path d="m22 9-6 6"/>
+    <path d="m16 9 6 6"/>
+  </Icon>
+)
+
+export const IconSearch = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="11" cy="11" r="7"/>
+    <path d="m21 21-4.3-4.3"/>
+  </Icon>
+)
+
+export const IconClose = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M18 6 6 18"/>
+    <path d="m6 6 12 12"/>
+  </Icon>
+)
+
+export const IconCheck = (p: IconProps) => (
+  <Icon {...p}><path d="M20 6 9 17l-5-5"/></Icon>
+)
+
 export const IconChevronRight = (p: IconProps) => (
   <Icon {...p}><path d="m9 6 6 6-6 6"/></Icon>
 )

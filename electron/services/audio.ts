@@ -11,13 +11,22 @@ const HW_DIR = '/opt/kmp/hw'
 // dead code on units without it, since readTriggerTime() just returns ''.
 const PCM_STATUS_PATH = '/proc/asound/sndrpihifiberry/pcm0p/sub0/status'
 
+// Silence padded before the audio starts (see the adelay note in play()).
+const COLD_AMP_DELAY_MS = 1000  // amp has to be woken up
+const WARM_DELAY_MS = 350       // amp already on — only covers the stream-volume lookup
+const NO_AMP_DELAY_MS = 250     // no I2S amp on this unit
+
 export interface Track {
   id: string
   filename: string
   filepath: string
   title: string
+  artist?: string
+  album?: string
   artwork?: string
   duration?: number
+  /** Repeat forever (generated alarm sounds are short patterns). */
+  loop?: boolean
 }
 
 export interface PlaybackState {
@@ -50,6 +59,11 @@ export class AudioService extends EventEmitter {
   }
   private positionInterval: NodeJS.Timeout | null = null
   private mediaDir: string
+  // Bumped on every play(); lets a superseded call (rapid skipping) bail out
+  // after each await instead of spawning a second ffplay.
+  private playSeq = 0
+  private ampEnabled = false
+  private libraryProvider: (() => Promise<Track[]>) | null = null
 
   constructor(mediaDir: string) {
     super()
@@ -129,46 +143,96 @@ export class AudioService extends EventEmitter {
     return undefined
   }
 
-  async play(track?: Track): Promise<void> {
-    if (track) {
-      // Stop current playback
-      await this.stop()
+  /** Where "play with nothing selected" and random picks get their songs. */
+  setLibraryProvider(provider: () => Promise<Track[]>): void {
+    this.libraryProvider = provider
+  }
 
-      this.state.currentTrack = track
-      this.state.position = 0
+  async play(track?: Track, opts: { startAt?: number } = {}): Promise<void> {
+    const seq = ++this.playSeq
+    if (!track && !this.state.currentTrack) return
+
+    if (track || opts.startAt !== undefined) {
+      if (track) {
+        this.state.currentTrack = track
+        this.state.duration = track.duration ?? 0
+      }
+      this.state.position = opts.startAt ?? 0
+      // Optimistic update: the UI shows the new song immediately instead of
+      // after the old process is torn down and the new one is running.
+      this.state.isPlaying = true
+      this.emit('stateChange', this.getState())
+
+      // If the amp is already on and its clock is running, keep it on across
+      // the switch (the sink stays open) instead of cycling it.
+      await this.killPlayer(this.ampEnabled && this.readPcmState() === 'RUNNING')
+      if (seq !== this.playSeq) return
     }
 
-    if (!this.state.currentTrack) {
-      return
-    }
+    const current = this.state.currentTrack!
+    const hasPcmStatus = fs.existsSync(PCM_STATUS_PATH)
 
     // Snapshot trigger_time BEFORE spawning so we can detect when the new
     // PCM session's DMA actually starts (trigger_time is a kernel timestamp
     // that changes each time snd_pcm_trigger fires).
     const triggerBaseline = this.readTriggerTime()
+    // trigger_time only changes on a cold start. If the PCM is already
+    // RUNNING (sink kept open by PipeWire between songs) BCLK is stable and
+    // waiting would just burn the whole timeout.
+    const needsPcmWait = hasPcmStatus && this.readPcmState() !== 'RUNNING'
+    const ampWasOn = this.ampEnabled
 
     // Use ffplay (comes with ffmpeg) for playback
     // -nodisp: no video window
     // -autoexit: exit when done
     // -loglevel quiet: suppress output
-    // adelay pads 1000 ms of digital silence so any I2S/amp startup transient,
-    // and the moment before we've resolved+set this stream's volume below,
-    // are both inaudible (silence at any volume is still silence) — a no-op
-    // cost on units without an amp to wake.
-    this.player = spawn('ffplay', [
-      '-nodisp',
-      '-autoexit',
-      '-loglevel', 'quiet',
-      '-af', 'adelay=1000|1000',
-      this.state.currentTrack.filepath,
-    ])
+    // adelay pads digital silence so the amp's startup transient, and the
+    // moment before we've resolved+set this stream's volume below, are both
+    // inaudible. It only needs to be long when the amp has to be woken up;
+    // a warm switch or a unit with no amp needs just enough to cover the
+    // stream-volume lookup.
+    const delayMs = ampWasOn ? WARM_DELAY_MS : hasPcmStatus ? COLD_AMP_DELAY_MS : NO_AMP_DELAY_MS
+    const args = ['-nodisp', '-autoexit', '-loglevel', 'quiet', '-af', `adelay=${delayMs}|${delayMs}`]
+    if (opts.startAt) args.push('-ss', String(opts.startAt))
+    if (current.loop) args.push('-loop', '0')
+    args.push(current.filepath)
+
+    const proc = spawn('ffplay', args)
+    this.player = proc
+
+    proc.on('close', (code) => {
+      if (this.player !== proc) return    // killed on purpose / superseded
+      this.player = null
+      this.stopPositionTracking()
+      this.state.isPlaying = false
+      this.state.position = 0
+      this.setAmpSD(false)
+      this.emit('stateChange', this.getState())
+      if (code === 0) {
+        // Track finished naturally
+        this.emit('trackEnded')
+        // Auto-play next if in queue
+        this.playNext()
+      }
+    })
+
+    proc.on('error', (err) => {
+      console.error('Audio player error:', err)
+      if (this.player !== proc) return
+      this.player = null
+      this.state.isPlaying = false
+      this.setAmpSD(false)
+      this.emit('stateChange', this.getState())
+    })
 
     // Wait until the PCM DMA has actually started (trigger_time changed) so
-    // we know I2S BCLK is stable before enabling the amp. Times out quickly
-    // and harmlessly on units without the hifiberry PCM status file.
-    const t0 = Date.now()
-    const detected = await this.waitForPCMRunning(triggerBaseline, 2000)
-    console.log(`[audio] PCM DMA started: detected=${detected} in ${Date.now() - t0} ms`)
+    // we know I2S BCLK is stable before enabling the amp.
+    if (needsPcmWait) {
+      const t0 = Date.now()
+      const detected = await this.waitForPCMRunning(triggerBaseline, 2000)
+      console.log(`[audio] PCM DMA started: detected=${detected} in ${Date.now() - t0} ms`)
+      if (seq !== this.playSeq) return
+    }
 
     this.setAmpSD(true)
 
@@ -179,6 +243,7 @@ export class AudioService extends EventEmitter {
     // @DEFAULT_AUDIO_SINK@, was confirmed on-device to have zero audible
     // effect for this stream's routing.
     this.currentStreamId = await this.getFfplayStreamId()
+    if (seq !== this.playSeq) return
     this.setAlsaVolume(this.state.volume)
 
     this.state.isPlaying = true
@@ -186,28 +251,25 @@ export class AudioService extends EventEmitter {
 
     // Track position (approximate since ffplay doesn't report it easily)
     this.startPositionTracking()
+  }
 
-    this.player.on('close', (code) => {
-      this.stopPositionTracking()
-      if (code === 0) {
-        // Track finished naturally
-        this.state.isPlaying = false
-        this.state.position = 0
-        this.setAmpSD(false)
-        this.emit('stateChange', this.getState())
-        this.emit('trackEnded')
+  /** Jump to `seconds` — ffplay can't seek externally, so this restarts it at that offset. */
+  async seek(seconds: number): Promise<void> {
+    if (!this.state.currentTrack) return
+    const max = this.state.duration > 1 ? this.state.duration - 1 : Infinity
+    await this.play(undefined, { startAt: Math.max(0, Math.min(max, Math.floor(seconds))) })
+  }
 
-        // Auto-play next if in queue
-        this.playNext()
-      }
-    })
-
-    this.player.on('error', (err) => {
-      console.error('Audio player error:', err)
-      this.state.isPlaying = false
-      this.setAmpSD(false)
-      this.emit('stateChange', this.getState())
-    })
+  /** Nothing selected: shuffle the whole library into the queue and start it. */
+  async playRandom(): Promise<void> {
+    const tracks = await (this.libraryProvider?.() ?? this.scanMedia())
+    if (tracks.length === 0) return
+    const shuffled = [...tracks]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    await this.setQueue(shuffled, 0)
   }
 
   async pause(): Promise<void> {
@@ -242,26 +304,38 @@ export class AudioService extends EventEmitter {
       await this.resume()
     } else if (this.state.currentTrack) {
       await this.play()
+    } else {
+      await this.playRandom()
     }
   }
 
-  async stop(): Promise<void> {
-    if (this.player) {
-      this.setAlsaVolume(0)
-      this.setAmpSD(false)                  // amp off before I2S clock stops
-      await new Promise<void>(resolve => setTimeout(resolve, 50))
-      // Await actual process exit so the PCM fd is fully released before the
-      // next play() opens it. Without this, new ffplay races the dying process
-      // for exclusive PCM access and SDL returns EBUSY intermittently.
-      const exited = new Promise<void>(resolve => this.player!.once('close', resolve))
-      this.player.kill('SIGKILL')
-      this.player = null
-      await exited
-    }
+  /**
+   * Silences and kills the current ffplay. `keepAmp` leaves the amplifier
+   * enabled (used when switching songs while the I2S clock keeps running).
+   */
+  private async killPlayer(keepAmp = false): Promise<void> {
+    this.stopPositionTracking()
+    const proc = this.player
+    if (!proc) return
+    this.setAlsaVolume(0)
+    if (!keepAmp) this.setAmpSD(false)      // amp off before I2S clock stops
+    await new Promise<void>(resolve => setTimeout(resolve, 50))
+    // Await actual process exit so the PCM fd is fully released before the
+    // next play() opens it. Without this, new ffplay races the dying process
+    // for exclusive PCM access and SDL returns EBUSY intermittently.
+    const alive = proc.exitCode === null && proc.signalCode === null
+    const exited = new Promise<void>(resolve => proc.once('close', resolve))
+    this.player = null
+    proc.kill('SIGKILL')
+    if (alive) await exited
     this.currentStreamId = null
+  }
+
+  async stop(): Promise<void> {
+    this.playSeq++    // cancel any play() still starting up
+    await this.killPlayer()
     this.state.isPlaying = false
     this.state.position = 0
-    this.stopPositionTracking()
     this.emit('stateChange', this.getState())
   }
 
@@ -277,11 +351,11 @@ export class AudioService extends EventEmitter {
     this.emit('stateChange', this.getState())
   }
 
-  setQueue(tracks: Track[], startIndex: number = 0): void {
+  async setQueue(tracks: Track[], startIndex: number = 0): Promise<void> {
     this.state.queue = tracks
     this.state.queueIndex = startIndex
     if (tracks.length > 0 && startIndex < tracks.length) {
-      this.play(tracks[startIndex])
+      await this.play(tracks[startIndex])
     }
   }
 
@@ -320,6 +394,16 @@ export class AudioService extends EventEmitter {
     try {
       const content = fs.readFileSync(PCM_STATUS_PATH, 'utf8')
       return content.match(/trigger_time:\s+(\S+)/)?.[1] ?? ''
+    } catch {
+      return ''
+    }
+  }
+
+  /** PCM state from the hifiberry status file ('RUNNING', 'PREPARED', 'closed', ...), '' if absent. */
+  private readPcmState(): string {
+    try {
+      const content = fs.readFileSync(PCM_STATUS_PATH, 'utf8')
+      return content.match(/^state:\s+(\S+)/m)?.[1] ?? content.trim()
     } catch {
       return ''
     }
@@ -379,6 +463,7 @@ export class AudioService extends EventEmitter {
   }
 
   private setAmpSD(enable: boolean): void {
+    this.ampEnabled = enable
     try {
       this.ampProc?.stdin?.write(JSON.stringify({ cmd: enable ? 'enable' : 'disable' }) + '\n')
     } catch {

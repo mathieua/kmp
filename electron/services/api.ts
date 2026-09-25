@@ -449,23 +449,13 @@ export function createApiService(
     if (!ssid) return res.status(400).json({ error: 'ssid is required' })
 
     try {
-      await wifiService.connect(ssid, password)
+      await wifiService.connectAndFinalize(ssid, password, onWifiConnected)
     } catch (err: unknown) {
       return res.status(422).json({ error: (err as Error).message || 'Connection failed' })
     }
 
-    // Connection succeeded — respond to phone, then clean up + reboot
+    // Connection succeeded — respond to phone; teardown/reboot happen shortly after
     res.json({ message: 'Connected. Rebooting…' })
-
-    setTimeout(async () => {
-      try {
-        await wifiService.teardownHotspot()
-        onWifiConnected?.()
-        await wifiService.reboot()
-      } catch (err) {
-        console.error('[WiFi] post-connect teardown error:', err)
-      }
-    }, 1500)
   })
 
   // ---- Start server ----

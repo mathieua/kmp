@@ -5,7 +5,10 @@ import { AlarmService } from './services/alarm'
 import { HardwareService } from './services/hardware'
 import { createApiService } from './services/api'
 import { WifiService } from './services/wifi'
-import { getMediaItems } from './services/database'
+import { DeviceService } from './services/device'
+import { LibraryService } from './services/library'
+import { ensureAlarmSounds } from './services/alarmSounds'
+import { getDefaultVolume, setDefaultVolume } from './services/database'
 import fs from 'fs'
 
 const isDev = process.env.NODE_ENV !== 'production'
@@ -15,7 +18,14 @@ let mainWindow: BrowserWindow | null = null
 let audioService: AudioService
 let alarmService: AlarmService
 let wifiService: WifiService
+let deviceService: DeviceService
 let hardwareService: HardwareService
+let libraryService: LibraryService
+// Generated alarm tones (written to the data dir on startup)
+let alarmSounds: Track[] = []
+// True from the moment an alarm fires until it's dismissed/snoozed, so we only
+// restore the volume afterwards when an alarm actually changed it.
+let alarmSession = false
 
 // Timers managed by main process when alarm fires
 let alarmVolumeRampTimer: NodeJS.Timeout | null = null
@@ -77,6 +87,9 @@ function setupAudioService() {
     : path.join(__dirname, '../../media')
 
   audioService = new AudioService(mediaDir)
+  libraryService = new LibraryService(audioService, mediaDir)
+  audioService.setLibraryProvider(() => libraryService.getTracks())
+  audioService.setVolume(getDefaultVolume())
 
   // Forward state changes to renderer
   audioService.on('stateChange', (state) => {
@@ -91,19 +104,37 @@ function setupAudioService() {
 function setupAlarmService() {
   alarmService = new AlarmService()
 
+  // Volume is always ramped up to (and restored to) the parent's default
+  // volume, so it doubles as the alarm's maximum loudness.
+  const restoreVolume = async () => {
+    if (!alarmSession) return
+    alarmSession = false
+    await audioService.setVolume(getDefaultVolume())
+  }
+
   alarmService.on('fired', async () => {
-    const tracks = await audioService.scanMedia()
-    if (tracks.length > 0) {
-      const alarm = alarmService.getAlarm()
-      const track = alarm?.sound_path
-        ? (tracks.find(t => t.filepath === alarm.sound_path) ?? tracks[Math.floor(Math.random() * tracks.length)])
-        : tracks[Math.floor(Math.random() * tracks.length)]
+    clearAlarmTimers()
+    alarmSession = true
+
+    // Chosen sound (a song or a generated tone) -> else a random song ->
+    // else a generated tone, so an empty library never means a silent alarm.
+    const alarm = alarmService.getAlarm()
+    const tracks = await libraryService.getTracks()
+    const chosen = alarm?.sound_path
+      ? [...alarmSounds, ...tracks].find(t => t.filepath === alarm.sound_path)
+      : undefined
+    const track = chosen
+      ?? (tracks.length > 0
+        ? tracks[Math.floor(Math.random() * tracks.length)]
+        : alarmSounds[0])
+
+    if (track) {
       await audioService.setVolume(0)
       await audioService.play(track)
 
-      // Ramp volume from 0 to 70 over 30s (10 steps × 3s)
+      // Fade in from 0 to the default volume over 30s (10 steps × 3s)
       let step = 0
-      const targetVolume = 70
+      const targetVolume = getDefaultVolume()
       const steps = 10
       alarmVolumeRampTimer = setInterval(async () => {
         step++
@@ -127,12 +158,14 @@ function setupAlarmService() {
   alarmService.on('dismissed', async () => {
     clearAlarmTimers()
     await audioService.stop()
+    await restoreVolume()
     mainWindow?.webContents.send('alarm:dismissed')
   })
 
   alarmService.on('snoozed', async () => {
     clearAlarmTimers()
     await audioService.stop()
+    await restoreVolume()
     mainWindow?.webContents.send('alarm:dismissed')
   })
 
@@ -144,19 +177,7 @@ function setupIpcHandlers(mediaDir: string) {
     return audioService.getState()
   })
 
-  ipcMain.handle('audio:scanMedia', async () => {
-    const tracks = await audioService.scanMedia()
-    const dbItems = getMediaItems()
-    const dbByPath = new Map(dbItems.map(item => [item.file_path, item]))
-    return tracks.map(track => {
-      const dbItem = dbByPath.get(track.filepath)
-      if (!dbItem) return track
-      const artwork = dbItem.thumbnail_url
-        ? path.join(mediaDir, dbItem.thumbnail_url.replace(/^\/media\//, ''))
-        : track.artwork
-      return { ...track, title: dbItem.title, artwork }
-    })
-  })
+  ipcMain.handle('audio:scanMedia', () => libraryService.getTracks())
 
   ipcMain.handle('audio:play', async (_, track?: Track) => {
     await audioService.play(track)
@@ -186,6 +207,19 @@ function setupIpcHandlers(mediaDir: string) {
     audioService.setQueue(tracks, startIndex)
   })
 
+  ipcMain.handle('audio:seek', async (_, seconds: number) => {
+    await audioService.seek(seconds)
+  })
+
+  // Settings
+  ipcMain.handle('settings:getDefaultVolume', () => getDefaultVolume())
+  ipcMain.handle('settings:setDefaultVolume', async (_, volume: number) => {
+    const v = setDefaultVolume(volume)
+    // Apply it right away so the parent hears what they picked.
+    await audioService.setVolume(v)
+    return v
+  })
+
   ipcMain.handle('audio:next', async () => {
     await audioService.playNext()
   })
@@ -201,6 +235,7 @@ function setupIpcHandlers(mediaDir: string) {
     mainWindow?.webContents.send('alarm:updated', updated)
     return updated
   })
+  ipcMain.handle('alarm:listSounds', () => alarmSounds)
   ipcMain.handle('alarm:snooze', () => alarmService.snooze())
   ipcMain.handle('alarm:dismiss', () => alarmService.dismiss())
 }
@@ -219,6 +254,7 @@ app.whenReady().then(() => {
     ? path.join(app.getPath('home'), 'alarm-clock/data')
     : path.join(__dirname, '../../data')
   fs.mkdirSync(dataDir, { recursive: true })
+  alarmSounds = ensureAlarmSounds(path.join(dataDir, 'alarm-sounds'))
 
   wifiService = new WifiService()
 
@@ -230,6 +266,19 @@ app.whenReady().then(() => {
 
   // WiFi IPC handlers
   ipcMain.handle('wifi:getStatus', () => wifiService.getStatus())
+  ipcMain.handle('wifi:scanNetworks', () => wifiService.scanNetworks())
+  ipcMain.handle('wifi:connect', (_, ssid: string, password: string) =>
+    wifiService.connectAndFinalize(ssid, password, () => {
+      mainWindow?.webContents.send('wifi:connected')
+    })
+  )
+
+  // Device IPC handlers (requires the DB, initialized inside createApiService above)
+  deviceService = new DeviceService()
+  ipcMain.handle('device:getHostname', () => deviceService.getHostname())
+  ipcMain.handle('device:isOnboarded', () => deviceService.isOnboarded())
+  ipcMain.handle('device:validateHostname', (_, name: string) => deviceService.validateHostname(name))
+  ipcMain.handle('device:setHostname', (_, name: string) => deviceService.setHostname(name))
 
   // Forward sync/USB events to renderer
   apiService.sync.onEvent((event, payload) => {

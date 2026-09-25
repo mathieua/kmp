@@ -146,6 +146,25 @@ export class WifiService {
     }
   }
 
+  // Connects, then — once actually connected — tears down the AP hotspot
+  // (if any), notifies the caller, and reboots so everything (NM, avahi,
+  // the app itself) comes back up cleanly on the new network. Shared by
+  // the phone-facing HTTP route and the on-device IPC path so both behave
+  // identically instead of duplicating this orchestration.
+  async connectAndFinalize(ssid: string, password: string, onConnected?: () => void): Promise<void> {
+    await this.connect(ssid, password)
+
+    setTimeout(async () => {
+      try {
+        await this.teardownHotspot()
+        onConnected?.()
+        await this.reboot()
+      } catch (err) {
+        console.error('[WiFi] post-connect teardown error:', err)
+      }
+    }, 1500)
+  }
+
   // Tear down the hotspot connection created by wifi-check.sh
   async teardownHotspot(): Promise<void> {
     const con = getHotspotConName()
