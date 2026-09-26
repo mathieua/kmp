@@ -15,6 +15,7 @@ const PCM_STATUS_PATH = '/proc/asound/sndrpihifiberry/pcm0p/sub0/status'
 const COLD_AMP_DELAY_MS = 1000  // amp has to be woken up
 const WARM_DELAY_MS = 350       // amp already on — only covers the stream-volume lookup
 const NO_AMP_DELAY_MS = 250     // no I2S amp on this unit
+const STREAM_LOOKUP_TIMEOUT_MS = 3000
 
 export interface Track {
   id: string
@@ -242,7 +243,13 @@ export class AudioService extends EventEmitter {
     // setAlsaVolume below) — the sink's own volume, adjustable via
     // @DEFAULT_AUDIO_SINK@, was confirmed on-device to have zero audible
     // effect for this stream's routing.
-    this.currentStreamId = await this.getFfplayStreamId()
+    // A new stream takes a moment to register. Without the PCM wait above
+    // (warm switch) the lookup can run before it exists — and a missed lookup
+    // leaves the stream at whatever volume WirePlumber restored (0%, since
+    // the previous song's stream was silenced), i.e. no sound. So retry until
+    // it shows up, matching by this process's pid so a dying old stream can't
+    // be mistaken for it.
+    this.currentStreamId = await this.waitForStreamId(proc, seq)
     if (seq !== this.playSeq) return
     this.setAlsaVolume(this.state.volume)
 
@@ -492,7 +499,20 @@ export class AudioService extends EventEmitter {
    * the sink's. Each ffplay spawn gets a new, unpredictable stream id, so
    * this must be re-resolved per track rather than cached across plays.
    */
-  private getFfplayStreamId(): Promise<string | null> {
+  private async waitForStreamId(proc: ChildProcess, seq: number): Promise<string | null> {
+    if (!this.hasWpctl || !proc.pid) return null
+    const deadline = Date.now() + STREAM_LOOKUP_TIMEOUT_MS
+    while (Date.now() < deadline) {
+      if (seq !== this.playSeq || this.player !== proc) return null
+      const id = await this.getFfplayStreamId(proc.pid)
+      if (id) return id
+      await new Promise<void>(resolve => setTimeout(resolve, 60))
+    }
+    console.warn('[audio] ffplay PipeWire stream never appeared; volume not applied')
+    return null
+  }
+
+  private getFfplayStreamId(pid: number): Promise<string | null> {
     return new Promise(resolve => {
       const proc = spawn('pw-dump')
       let out = ''
@@ -503,6 +523,7 @@ export class AudioService extends EventEmitter {
           const stream = nodes.find(n =>
             n.type === 'PipeWire:Interface:Node' &&
             n.info?.props?.['application.process.binary'] === 'ffplay' &&
+            Number(n.info?.props?.['application.process.id']) === pid &&
             n.info?.props?.['media.class'] === 'Stream/Output/Audio'
           )
           resolve(stream ? String(stream.id) : null)
