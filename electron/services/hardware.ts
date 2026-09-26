@@ -25,6 +25,10 @@ const ENCODER_SOCK   = '/tmp/kmp-encoder.sock'
 const BUTTONS_SOCK   = '/tmp/kmp-buttons.sock'
 const BACKLIGHT_ROOT = '/sys/class/backlight'
 const HW_DIR         = '/opt/kmp/hw'
+// The encoder daemon reports which way the knob turned assuming its A/B pins
+// are wired one particular way; on this build, clockwise arrives as
+// 'volume_down'. Flip this to swap the direction without touching the daemon.
+const ENCODER_REVERSED = true
 const HYSTERESIS_PCT = 5  // percent — prevents flicker near thresholds
 
 /**
@@ -140,6 +144,10 @@ export class HardwareService {
   // ---------------------------------------------------------------------------
 
   private onEncoderEvent(event: string): void {
+    if (ENCODER_REVERSED) {
+      if (event === 'volume_up') event = 'volume_down'
+      else if (event === 'volume_down') event = 'volume_up'
+    }
     switch (event) {
       case 'volume_up': {
         const vol = Math.min(100, this.audio.getState().volume + 2)
