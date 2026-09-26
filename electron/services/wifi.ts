@@ -19,6 +19,13 @@ export interface WifiStatus {
   hostname: string | null
 }
 
+export interface WifiConnection {
+  connected: boolean
+  ssid: string | null
+  /** 0-100 */
+  signal: number
+}
+
 const AP_MODE_FLAG = '/tmp/wifi-ap-mode'
 const HOTSPOT_DEFAULT_IP = '10.42.0.1'
 
@@ -75,6 +82,23 @@ export class WifiService {
     } catch {
       return HOTSPOT_DEFAULT_IP
     }
+  }
+
+  // Current association, from the cached scan list (no rescan — cheap enough to poll).
+  async getConnection(): Promise<WifiConnection> {
+    try {
+      const { stdout } = await execAsync(
+        'nmcli -t -f IN-USE,SSID,SIGNAL dev wifi list ifname wlan0 --rescan no 2>/dev/null'
+      )
+      for (const line of stdout.split('\n')) {
+        const parts = parseTerseLine(line)
+        if (parts.length < 3 || parts[0].trim() !== '*') continue
+        const ssid = parts.slice(1, parts.length - 1).join(':').trim()
+        if (ssid === getHotspotConName()) break   // our own setup hotspot isn't "connected"
+        return { connected: true, ssid, signal: parseInt(parts[parts.length - 1]) || 0 }
+      }
+    } catch { /* nmcli missing (dev machine) or no wlan0 */ }
+    return { connected: false, ssid: null, signal: 0 }
   }
 
   // List nearby networks via nmcli, deduped and sorted by signal

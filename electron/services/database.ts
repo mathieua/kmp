@@ -41,6 +41,7 @@ export function initDatabase(dataDir: string): void {
   const dbPath = path.join(dataDir, 'portal.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
+  db.pragma('foreign_keys = ON')
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS media_items (
@@ -83,6 +84,21 @@ export function initDatabase(dataDir: string): void {
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
+    );
+
+    -- Playlists are created in the parent portal; the clock only browses them.
+    -- Items reference songs by file path (the id the clock's library uses).
+    CREATE TABLE IF NOT EXISTS playlists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS playlist_items (
+      playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+      file_path TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      PRIMARY KEY (playlist_id, file_path)
     );
 
     -- ffprobe results, keyed by file and invalidated by mtime/size so a
@@ -276,4 +292,47 @@ export function upsertTrackMeta(meta: TrackMeta): void {
     ON CONFLICT(file_path) DO UPDATE SET
       mtime_ms = @mtime_ms, size = @size, duration = @duration, artist = @artist, album = @album
   `).run(meta)
+}
+
+// ---- Playlists ----
+
+export interface Playlist {
+  id: number
+  name: string
+  /** Song file paths, in play order. */
+  paths: string[]
+}
+
+export function getPlaylists(): Playlist[] {
+  const rows = db.prepare('SELECT id, name FROM playlists ORDER BY name COLLATE NOCASE').all() as { id: number; name: string }[]
+  const items = db.prepare('SELECT playlist_id, file_path FROM playlist_items ORDER BY playlist_id, position')
+    .all() as { playlist_id: number; file_path: string }[]
+  return rows.map(r => ({ ...r, paths: items.filter(i => i.playlist_id === r.id).map(i => i.file_path) }))
+}
+
+export function getPlaylist(id: number): Playlist | undefined {
+  return getPlaylists().find(p => p.id === id)
+}
+
+export function createPlaylist(name: string, paths: string[] = []): Playlist {
+  const id = db.prepare('INSERT INTO playlists (name) VALUES (?)').run(name).lastInsertRowid as number
+  setPlaylistItems(id, paths)
+  return getPlaylist(id)!
+}
+
+export function renamePlaylist(id: number, name: string): void {
+  db.prepare('UPDATE playlists SET name = ? WHERE id = ?').run(name, id)
+}
+
+export function deletePlaylist(id: number): void {
+  db.prepare('DELETE FROM playlists WHERE id = ?').run(id)
+}
+
+/** Replaces the playlist's songs with `paths` (duplicates dropped, order kept). */
+export function setPlaylistItems(id: number, paths: string[]): void {
+  const insert = db.prepare('INSERT INTO playlist_items (playlist_id, file_path, position) VALUES (?, ?, ?)')
+  db.transaction(() => {
+    db.prepare('DELETE FROM playlist_items WHERE playlist_id = ?').run(id)
+    ;[...new Set(paths)].forEach((p, i) => insert.run(id, p, i))
+  })()
 }

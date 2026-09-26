@@ -10,6 +10,13 @@ export interface Track {
   loop?: boolean
 }
 
+export interface Playlist {
+  id: number
+  name: string
+  /** Song file paths, in play order. */
+  paths: string[]
+}
+
 export interface PlaybackState {
   isPlaying: boolean
   currentTrack: Track | null
@@ -63,6 +70,17 @@ export interface WifiStatus {
   hostname: string | null
 }
 
+export interface WifiConnection {
+  connected: boolean
+  ssid: string | null
+  signal: number   // 0-100
+}
+
+export interface BatteryStatus {
+  level: number    // 0-100
+  charging: boolean
+}
+
 export interface Alarm {
   id: number
   time: string      // 'HH:MM'
@@ -78,9 +96,12 @@ export interface ElectronAPI {
     getStatus: () => Promise<WifiStatus>
     scanNetworks: () => Promise<WifiNetwork[]>
     connect: (ssid: string, password: string) => Promise<void>
+    getConnection: () => Promise<WifiConnection>
+    switchNetwork: (ssid: string, password: string) => Promise<void>
     onConnected: (callback: () => void) => () => void
   }
   device: {
+    getBattery: () => Promise<BatteryStatus | null>
     getHostname: () => Promise<string>
     isOnboarded: () => Promise<boolean>
     validateHostname: (name: string) => Promise<string | null>
@@ -98,6 +119,7 @@ export interface ElectronAPI {
   }
   audio: {
     getState: () => Promise<PlaybackState>
+    getPlaylists: () => Promise<Playlist[]>
     scanMedia: () => Promise<Track[]>
     play: (track?: Track) => Promise<void>
     pause: () => Promise<void>

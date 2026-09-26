@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Audio controls
   audio: {
     getState: (): Promise<PlaybackState> => ipcRenderer.invoke('audio:getState'),
+    getPlaylists: () => ipcRenderer.invoke('library:getPlaylists'),
     scanMedia: (): Promise<Track[]> => ipcRenderer.invoke('audio:scanMedia'),
     play: (track?: Track): Promise<void> => ipcRenderer.invoke('audio:play', track),
     pause: (): Promise<void> => ipcRenderer.invoke('audio:pause'),
@@ -89,6 +90,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   wifi: {
     getStatus: () => ipcRenderer.invoke('wifi:getStatus'),
     scanNetworks: () => ipcRenderer.invoke('wifi:scanNetworks'),
+    getConnection: () => ipcRenderer.invoke('wifi:getConnection'),
+    switchNetwork: (ssid: string, password: string) => ipcRenderer.invoke('wifi:switchNetwork', ssid, password),
     connect: (ssid: string, password: string) => ipcRenderer.invoke('wifi:connect', ssid, password),
     onConnected: (callback: () => void) => {
       const listener = () => callback()
@@ -99,6 +102,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Device identity / OOBE
   device: {
+    getBattery: () => ipcRenderer.invoke('device:getBattery'),
     getHostname: () => ipcRenderer.invoke('device:getHostname'),
     isOnboarded: () => ipcRenderer.invoke('device:isOnboarded'),
     validateHostname: (name: string) => ipcRenderer.invoke('device:validateHostname', name),

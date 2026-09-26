@@ -3,6 +3,7 @@ import { Palette, Lang, Route, t, DATE_LABELS } from '../App'
 import { Alarm, Track } from '../types'
 import { CircleBtn, IconAlarm, IconMusic, IconPlay, IconPause } from '../components/Icons'
 import { HeaderActions } from '../components/HeaderActions'
+import { StatusIcons } from '../components/StatusIcons'
 
 interface ClockProps {
   palette: Palette
@@ -45,6 +46,11 @@ export function Clock({ palette, lang, alarm, isPlaying, currentTrack, onToggleP
       display: 'flex', flexDirection: 'column', padding: 'var(--pad)', gap: 'var(--pad)',
       position: 'relative', overflow: 'hidden',
     }}>
+      {/* Wifi / battery — top left */}
+      <div style={{ position: 'absolute', top: 'var(--gap)', left: 'var(--gap)', zIndex: 2 }}>
+        <StatusIcons />
+      </div>
+
       {/* Volume + settings — top right */}
       <div style={{ position: 'absolute', top: 'var(--gap)', right: 'var(--gap)', zIndex: 2 }}>
         <HeaderActions onNavigate={onNavigate} />

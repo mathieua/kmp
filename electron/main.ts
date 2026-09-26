@@ -8,7 +8,7 @@ import { WifiService } from './services/wifi'
 import { DeviceService } from './services/device'
 import { LibraryService } from './services/library'
 import { ensureAlarmSounds } from './services/alarmSounds'
-import { getDefaultVolume, setDefaultVolume } from './services/database'
+import { getDefaultVolume, setDefaultVolume, getPlaylists } from './services/database'
 import fs from 'fs'
 
 const isDev = process.env.NODE_ENV !== 'production'
@@ -177,6 +177,7 @@ function setupIpcHandlers(mediaDir: string) {
     return audioService.getState()
   })
 
+  ipcMain.handle('library:getPlaylists', () => getPlaylists())
   ipcMain.handle('audio:scanMedia', () => libraryService.getTracks())
 
   ipcMain.handle('audio:play', async (_, track?: Track) => {
@@ -266,6 +267,9 @@ app.whenReady().then(() => {
 
   // WiFi IPC handlers
   ipcMain.handle('wifi:getStatus', () => wifiService.getStatus())
+  ipcMain.handle('wifi:getConnection', () => wifiService.getConnection())
+  // Change network from Settings: connect in place, no teardown/reboot (unlike wifi:connect, the AP-setup flow).
+  ipcMain.handle('wifi:switchNetwork', (_, ssid: string, password: string) => wifiService.connect(ssid, password))
   ipcMain.handle('wifi:scanNetworks', () => wifiService.scanNetworks())
   ipcMain.handle('wifi:connect', (_, ssid: string, password: string) =>
     wifiService.connectAndFinalize(ssid, password, () => {
@@ -275,6 +279,7 @@ app.whenReady().then(() => {
 
   // Device IPC handlers (requires the DB, initialized inside createApiService above)
   deviceService = new DeviceService()
+  ipcMain.handle('device:getBattery', () => deviceService.getBattery())
   ipcMain.handle('device:getHostname', () => deviceService.getHostname())
   ipcMain.handle('device:isOnboarded', () => deviceService.isOnboarded())
   ipcMain.handle('device:validateHostname', (_, name: string) => deviceService.validateHostname(name))

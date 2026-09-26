@@ -6,6 +6,7 @@ import { MusicPlayer } from './views/MusicPlayer'
 import { Settings } from './views/Settings'
 import { DimmedClock } from './views/DimmedClock'
 import { WifiSetup } from './views/WifiSetup'
+import { WifiSettings } from './views/WifiSettings'
 import { Onboarding } from './views/Onboarding'
 import { useAlarm } from './hooks/useAlarm'
 import { usePlayback } from './hooks/useAudio'
@@ -70,6 +71,9 @@ export const STRINGS = {
     searchHint: 'Tap to type a song, artist or album', noResults: 'Nothing found',
     noMusic: 'No music yet', addMusicHint: 'Add music via the parent portal',
     done: 'Done', volume: 'Volume',
+    wifi: 'WiFi', connectedTo: 'Connected to', notConnected: 'Not connected', changeNetwork: 'Change network',
+    scanning: 'Scanning…', noNetworks: 'No networks found', rescan: 'Scan again',
+    wifiPassword: 'Password', connecting: 'Connecting…', connectFailed: 'Could not connect. Check the password.', tryAgain: 'Try again',
     defaultVolume: 'Default volume',
     defaultVolumeHint: 'Starting volume, and the loudest the alarm gets',
     sound: 'Alarm sound', randomSong: 'Random song', alarmSounds: 'Alarm sounds',
@@ -91,6 +95,9 @@ export const STRINGS = {
     searchHint: 'Touchez pour chercher un titre, artiste ou album', noResults: 'Aucun résultat',
     noMusic: 'Pas encore de musique', addMusicHint: 'Ajoutez de la musique via le portail parents',
     done: 'OK', volume: 'Volume',
+    wifi: 'WiFi', connectedTo: 'Connecté à', notConnected: 'Non connecté', changeNetwork: 'Changer de réseau',
+    scanning: 'Recherche…', noNetworks: 'Aucun réseau trouvé', rescan: 'Rechercher',
+    wifiPassword: 'Mot de passe', connecting: 'Connexion…', connectFailed: 'Connexion impossible. Vérifiez le mot de passe.', tryAgain: 'Réessayer',
     defaultVolume: 'Volume par défaut',
     defaultVolumeHint: 'Volume de départ, et le maximum de l\'alarme',
     sound: 'Son de l\'alarme', randomSong: 'Chanson au hasard', alarmSounds: 'Sons d\'alarme',
@@ -147,7 +154,7 @@ function Stage({ children }: { children: React.ReactNode }) {
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
-export type Route = 'clock' | 'alarms' | 'library' | 'player' | 'settings'
+export type Route = 'clock' | 'alarms' | 'library' | 'player' | 'settings' | 'wifi'
 
 // ── App ────────────────────────────────────────────────────────────────────
 function App() {
@@ -235,7 +242,7 @@ function App() {
   const wake = useCallback(() => setDimmed(false), [])
 
   const navigate = useCallback((r: Route) => {
-    if (r === 'settings') setReturnRoute(cur => (route === 'settings' ? cur : route))
+    if (r === 'settings') setReturnRoute(cur => (route === 'settings' || route === 'wifi' ? cur : route))
     setRoute(r)
     setDimmed(false)
   }, [route])
@@ -300,6 +307,14 @@ function App() {
             <MusicPlayer
               palette={palette}
               lang={lang}
+              onNavigate={navigate}
+            />
+          )}
+          {route === 'wifi' && (
+            <WifiSettings
+              palette={palette}
+              lang={lang}
+              onBack={() => navigate('settings')}
               onNavigate={navigate}
             />
           )}

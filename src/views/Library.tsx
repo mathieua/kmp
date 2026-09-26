@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Palette, Lang, Route, t, SONG_GRADIENTS } from '../App'
 import { Track } from '../types'
-import { useLibrary, usePlayback } from '../hooks/useAudio'
+import { useLibrary, usePlayback, usePlaylists } from '../hooks/useAudio'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { HeaderActions } from '../components/HeaderActions'
 import { OnScreenKeyboard } from '../components/OnScreenKeyboard'
 import {
-  CircleBtn, IconMusic, IconPlay, IconPause, IconSearch, IconClose, IconChevronRight, Equalizer,
+  CircleBtn, IconList, IconMusic, IconPlay, IconPause, IconSearch, IconClose, IconChevronRight, Equalizer,
 } from '../components/Icons'
 import {
   artworkUrl, formatTime, searchTracks, sortByTitle, groupTracks, firstArtwork, Group,
@@ -21,19 +21,17 @@ interface LibraryProps {
 type Tab = 'songs' | 'artists' | 'albums' | 'search'
 
 // ── Playlists ──────────────────────────────────────────────────────────────
-// For now the only playlist is the built-in "All" (every song). With just one,
-// the playlist picker is skipped and it opens straight away; the picker shows
-// up on its own as soon as a second playlist exists.
-interface Playlist {
+// "All" is built in (every song, sorted by title). Other playlists are made in
+// the parent app and keep the order they were given. With only "All" it opens
+// right away; the playlist picker is always one tap away via the header button.
+interface PlaylistView {
   id: string
-  nameKey: 'allPlaylist'
+  name: string
   coverIndex: number   // into SONG_GRADIENTS (resolved at render — App imports this file)
   emoji: string
-  select: (all: Track[]) => Track[]
+  ordered: boolean     // keep the playlist's own order instead of sorting by title
+  songs: Track[]
 }
-const PLAYLISTS: Playlist[] = [
-  { id: 'all', nameKey: 'allPlaylist', coverIndex: 2, emoji: '🎵', select: all => all },
-]
 
 // Remembered across visits so "back" from the player lands exactly where you were.
 interface Nav { playlist: string | null; tab: Tab; artist: string | null; album: string | null; query: string }
@@ -79,8 +77,10 @@ const ellipsis: React.CSSProperties = { whiteSpace: 'nowrap', overflow: 'hidden'
 export function Library({ palette, lang, onNavigate }: LibraryProps) {
   const { tracks, isLoading } = useLibrary()
   const player = usePlayback()
+  const dbPlaylists = usePlaylists()
 
   const [playlistId, setPlaylistId] = useState(saved.playlist)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [tab, setTab] = useState<Tab>(saved.tab)
   const [artist, setArtist] = useState(saved.artist)
   const [album, setAlbum] = useState(saved.album)
@@ -90,12 +90,23 @@ export function Library({ palette, lang, onNavigate }: LibraryProps) {
   useEffect(() => { saved = { playlist: playlistId, tab, artist, album, query } },
     [playlistId, tab, artist, album, query])
 
-  // Single playlist -> select it right away.
-  const playlist = PLAYLISTS.length === 1
-    ? PLAYLISTS[0]
-    : PLAYLISTS.find(p => p.id === playlistId) ?? null
+  const views = useMemo<PlaylistView[]>(() => {
+    const byPath = new Map(tracks.map(tr => [tr.filepath, tr]))
+    return [
+      { id: 'all', name: t(lang, 'allPlaylist'), coverIndex: 2, emoji: '🎵', ordered: false, songs: sortByTitle(tracks) },
+      ...dbPlaylists.map((p, i) => ({
+        id: `p${p.id}`, name: p.name, coverIndex: 3 + i, emoji: '🎶', ordered: true,
+        // Songs whose files are gone are skipped.
+        songs: p.paths.map(path => byPath.get(path)).filter((tr): tr is Track => !!tr),
+      })),
+    ]
+  }, [tracks, dbPlaylists, lang])
 
-  const songs = useMemo(() => (playlist ? sortByTitle(playlist.select(tracks)) : []), [playlist, tracks])
+  // Only "All" -> open it right away; otherwise show the picker until one is chosen.
+  const chosen = views.find(v => v.id === playlistId) ?? (views.length === 1 ? views[0] : null)
+  const playlist = pickerOpen ? null : chosen
+
+  const songs = playlist?.songs ?? []
   const artists = useMemo(() => groupTracks(songs, s => s.artist ?? ''), [songs])
   const albums = useMemo(() => groupTracks(songs, s => s.album ?? ''), [songs])
   const results = useMemo(() => searchTracks(songs, query), [songs, query])
@@ -120,7 +131,7 @@ export function Library({ palette, lang, onNavigate }: LibraryProps) {
 
   const back = () => {
     if (inDetail) { setArtist(null); setAlbum(null) }
-    else if (PLAYLISTS.length > 1 && playlist) setPlaylistId(null)
+    else if (views.length > 1) setPickerOpen(true)
     else onNavigate('clock')
   }
 
@@ -192,28 +203,30 @@ export function Library({ palette, lang, onNavigate }: LibraryProps) {
     }}>{children}</div>
   )
 
-  // ── Playlist picker (only when there is more than one playlist) ──────────
+  // ── Playlist picker ──────────────────────────────────────────────────────
   if (!playlist) {
     return shell(
       <>
-        <ScreenHeader title={t(lang, 'myMusic')} onBack={() => onNavigate('clock')}
+        <ScreenHeader title={t(lang, 'playlists')}
+          // Back returns to the open playlist if there is one, else leaves the library.
+          onBack={() => (chosen ? setPickerOpen(false) : onNavigate('clock'))}
           right={<HeaderActions onNavigate={onNavigate} />} />
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--gap-sm)' }}>
-          {PLAYLISTS.map(p => {
-            return (
-              <ListRow key={p.id} onClick={() => setPlaylistId(p.id)}>
-                <div style={{
-                  width: 'var(--thumb-lg)', height: 'var(--thumb-lg)', borderRadius: 'var(--r-sm)', background: SONG_GRADIENTS[p.coverIndex],
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-h1)', flexShrink: 0,
-                }}>{p.emoji}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800 }}>{t(lang, p.nameKey)}</div>
-                  <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.85 }}>{count(p.select(tracks).length)}</div>
-                </div>
-                <IconChevronRight size="var(--icon)" stroke="#fff" />
-              </ListRow>
-            )
-          })}
+          {views.map(p => (
+            <ListRow key={p.id} active={chosen?.id === p.id} onClick={() => {
+              setPlaylistId(p.id); setPickerOpen(false); setTab('songs'); setArtist(null); setAlbum(null)
+            }}>
+              <div style={{
+                width: 'var(--thumb-lg)', height: 'var(--thumb-lg)', borderRadius: 'var(--r-sm)', background: SONG_GRADIENTS[p.coverIndex % SONG_GRADIENTS.length],
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-h1)', flexShrink: 0,
+              }}>{p.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, ...ellipsis }}>{p.name}</div>
+                <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.85 }}>{count(p.songs.length)}</div>
+              </div>
+              <IconChevronRight size="var(--icon)" stroke="#fff" />
+            </ListRow>
+          ))}
         </div>
       </>
     )
@@ -241,7 +254,7 @@ export function Library({ palette, lang, onNavigate }: LibraryProps) {
 
   const title = selectedGroup
     ? (artist !== null ? artistName(selectedGroup.name) : albumName(selectedGroup.name))
-    : t(lang, 'myMusic')
+    : playlist.id === 'all' ? t(lang, 'myMusic') : playlist.name
 
   const searchField = (
     <div style={{ display: 'flex', gap: 'var(--gap-sm)', alignItems: 'center', flexShrink: 0 }}>
@@ -281,7 +294,11 @@ export function Library({ palette, lang, onNavigate }: LibraryProps) {
     <>
       {searching ? searchField : (
         <>
-          <ScreenHeader title={title} onBack={back} right={<HeaderActions onNavigate={onNavigate} />} />
+          <ScreenHeader title={title} onBack={back} right={
+            <HeaderActions onNavigate={onNavigate}>
+              <CircleBtn onClick={() => setPickerOpen(true)}><IconList size="var(--icon)" /></CircleBtn>
+            </HeaderActions>
+          } />
 
           {!inDetail && (
             <div style={{ display: 'flex', gap: 'var(--gap-xs)', flexShrink: 0 }}>

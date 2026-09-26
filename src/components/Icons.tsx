@@ -109,6 +109,13 @@ export const IconVolumeMute = (p: IconProps) => (
   </Icon>
 )
 
+export const IconList = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/>
+    <path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>
+  </Icon>
+)
+
 export const IconSearch = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="11" cy="11" r="7"/>
@@ -126,6 +133,38 @@ export const IconClose = (p: IconProps) => (
 export const IconCheck = (p: IconProps) => (
   <Icon {...p}><path d="M20 6 9 17l-5-5"/></Icon>
 )
+
+/** `bars` is 1-4 signal strength. */
+export const IconWifi = ({ bars = 4, ...p }: IconProps & { bars?: number }) => (
+  <Icon {...p}>
+    <path d="M5 12.5a10 10 0 0 1 14 0" opacity={bars >= 3 ? 1 : 0.3}/>
+    <path d="M8.5 16a5 5 0 0 1 7 0" opacity={bars >= 2 ? 1 : 0.3}/>
+    <path d="M2 9a14 14 0 0 1 20 0" opacity={bars >= 4 ? 1 : 0.3}/>
+    <circle cx="12" cy="19.5" r="1" fill="currentColor"/>
+  </Icon>
+)
+
+export const IconWifiOff = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8.5 16a5 5 0 0 1 7 0" opacity="0.4"/>
+    <path d="M5 12.5a10 10 0 0 1 14 0" opacity="0.4"/>
+    <path d="M3 3l18 18"/>
+  </Icon>
+)
+
+/** `level` 0-100; shows a bolt when charging. */
+export const IconBattery = ({ level = 100, charging = false, ...p }: IconProps & { level?: number; charging?: boolean }) => {
+  const w = Math.max(0, Math.min(100, level)) / 100 * 13
+  return (
+    <Icon {...p}>
+      <rect x="2" y="7" width="17" height="10" rx="2.5"/>
+      <path d="M22 11v2"/>
+      <rect x="4" y="9" width={w} height="6" rx="1" fill="currentColor" stroke="none"
+        opacity={level <= 15 && !charging ? 0.9 : 1}/>
+      {charging && <path d="M11.5 8.5 9 12.5h3.5L10.5 16" stroke="#000" strokeWidth="1.6" opacity="0.55"/>}
+    </Icon>
+  )
+}
 
 export const IconChevronRight = (p: IconProps) => (
   <Icon {...p}><path d="m9 6 6 6-6 6"/></Icon>

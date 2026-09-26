@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Track, PlaybackState } from '../types'
+import { Track, PlaybackState, Playlist } from '../types'
 
 const initialState: PlaybackState = {
   isPlaying: false,
@@ -66,4 +66,13 @@ export function useAudio() {
   const { tracks, isLoading, rescan } = useLibrary()
   const playTrack = useCallback((track: Track) => playback.playFrom(tracks, track), [playback.playFrom, tracks])
   return { ...playback, tracks, isLoading, rescan, playTrack }
+}
+
+/** Playlists made in the parent app. Refetched on mount so new ones show up. */
+export function usePlaylists(): Playlist[] {
+  const [playlists, setPlaylists] = useState<Playlist[]>([])
+  useEffect(() => {
+    window.electronAPI.audio.getPlaylists().then(setPlaylists).catch(() => {})
+  }, [])
+  return playlists
 }

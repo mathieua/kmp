@@ -23,6 +23,7 @@ import {
   getImportJobs,
   updateImportJob,
   MediaItem,
+  getPlaylists, getPlaylist, createPlaylist, renamePlaylist, deletePlaylist, setPlaylistItems,
 } from './database'
 
 const execAsync = promisify(exec)
@@ -257,6 +258,40 @@ export function createApiService(
   app.get('/api/portal/artists', (req: Request, res: Response) => {
     const { category } = req.query as { category?: string }
     res.json(getArtists(category))
+  })
+
+  // ---- Playlist endpoints (the parent app creates/edits; the clock just browses) ----
+
+  const cleanName = (v: unknown) => (typeof v === 'string' ? v.trim().slice(0, 60) : '')
+  const cleanPaths = (v: unknown) => (Array.isArray(v) ? v.filter((p): p is string => typeof p === 'string') : [])
+
+  app.get('/api/portal/playlists', (_req: Request, res: Response) => {
+    res.json(getPlaylists())
+  })
+
+  app.post('/api/portal/playlists', (req: Request, res: Response) => {
+    const name = cleanName(req.body?.name)
+    if (!name) return res.status(400).json({ error: 'name is required' })
+    res.status(201).json(createPlaylist(name, cleanPaths(req.body?.paths)))
+  })
+
+  // Body: { name?, paths? } — paths replaces the whole song list, in order.
+  app.patch('/api/portal/playlists/:id', (req: Request, res: Response) => {
+    const id = Number(req.params.id)
+    if (!getPlaylist(id)) return res.status(404).json({ error: 'Not found' })
+    if (req.body?.name !== undefined) {
+      const name = cleanName(req.body.name)
+      if (!name) return res.status(400).json({ error: 'name cannot be empty' })
+      renamePlaylist(id, name)
+    }
+    if (req.body?.paths !== undefined) setPlaylistItems(id, cleanPaths(req.body.paths))
+    res.json(getPlaylist(id))
+  })
+
+  app.delete('/api/portal/playlists/:id', (req: Request, res: Response) => {
+    if (!getPlaylist(Number(req.params.id))) return res.status(404).json({ error: 'Not found' })
+    deletePlaylist(Number(req.params.id))
+    res.status(204).send()
   })
 
   // ---- YouTube import endpoints ----
