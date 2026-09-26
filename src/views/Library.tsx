@@ -208,8 +208,8 @@ export function Library({ palette, lang, onNavigate }: LibraryProps) {
     return shell(
       <>
         <ScreenHeader title={t(lang, 'playlists')}
-          // Back returns to the open playlist if there is one, else leaves the library.
-          onBack={() => (chosen ? setPickerOpen(false) : onNavigate('clock'))}
+          // The picker is the top level, so Back always goes to the clock.
+          onBack={() => { setPickerOpen(false); onNavigate('clock') }}
           right={<HeaderActions onNavigate={onNavigate} />} />
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--gap-sm)' }}>
           {views.map(p => (
