@@ -1,4 +1,4 @@
-# Kids Alarm Clock
+# Kid Music Player
 
 A Raspberry Pi-based alarm clock for kids with a touchscreen UI and a parent portal for managing music content.
 
