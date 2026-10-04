@@ -59,7 +59,8 @@ export class DeviceService {
     // Bundled into one script (see scripts/set-hostname.sh) rather than
     // calling hostnamectl/sed/tee directly, so the sudoers grant stays
     // scoped to "rename this device" rather than broad file-editing power.
-    await execAsync(`sudo /home/pi/alarm-clock/scripts/set-hostname.sh ${q(trimmed)}`)
+    const script = process.env.KMP_SET_HOSTNAME_SCRIPT ?? '/home/pi/alarm-clock/scripts/set-hostname.sh'
+    await execAsync(`sudo ${script} ${q(trimmed)}`)
 
     setHostnameOnboarded()
     await execAsync('sudo reboot')

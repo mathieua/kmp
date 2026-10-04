@@ -9,10 +9,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HW_DEST=/opt/kmp/hw
 
-echo "→ Installing Python drivers to $HW_DEST"
-mkdir -p "$HW_DEST"
-cp "$SCRIPT_DIR"/*.py "$HW_DEST/"
-chmod +x "$HW_DEST"/*.py
+if [ -L "$HW_DEST" ]; then
+    # OTA layout (scripts/install-ota.sh): drivers come from /opt/kmp/current/hw.
+    echo "→ $HW_DEST is managed by the OTA updater; skipping driver copy"
+else
+    echo "→ Installing Python drivers to $HW_DEST"
+    mkdir -p "$HW_DEST"
+    cp "$SCRIPT_DIR"/*.py "$HW_DEST/"
+    chmod +x "$HW_DEST"/*.py
+fi
 
 echo "→ Installing systemd service files"
 cp "$SCRIPT_DIR/kmp-buttons.service" /etc/systemd/system/

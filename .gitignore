@@ -10,3 +10,4 @@ wpa_supplicant.conf
 media/*
 !media/.gitkeep
 hw/pcb/.history/
+out/

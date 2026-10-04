@@ -8,6 +8,7 @@ import * as fsPromises from 'fs/promises'
 import { spawn, exec, ChildProcess } from 'child_process'
 import { promisify } from 'util'
 import { WifiService, buildSetupPageHtml } from './wifi'
+import { UpdateService } from './updater'
 import {
   initDatabase,
   getMediaItems,
@@ -157,11 +158,17 @@ export function createApiService(
   const thumbnailDir = path.join(mediaDir, '.thumbnails')
   fs.mkdirSync(thumbnailDir, { recursive: true })
 
-  initDatabase(dataDir)
+  initDatabase(dataDir, path.join(__dirname, '../../../migrations'))
   scanMediaDir(mediaDir).catch(console.error)
 
   const app = express()
   app.use(express.json())
+  const updater = new UpdateService()
+
+  // Liveness + running version; the OTA updater polls this after activating a release.
+  app.get('/api/health', (_req: Request, res: Response) => {
+    res.json({ ok: true, version: updater.getVersion() })
+  })
 
   // Serve portal static files
   const portalDist = path.join(__dirname, '../../portal')
@@ -451,6 +458,29 @@ export function createApiService(
       res.status(500).json({ error: (err as Error).message })
     }
   })
+
+  // ---- OTA update endpoints ----
+  // Same trust model as every other /api/portal route (LAN-only, no auth);
+  // the root updater only ever installs a checksum-verified published release.
+
+  app.get('/api/update-status', (_req: Request, res: Response) => {
+    res.json(updater.getStatus())
+  })
+
+  const requestUpdate = (action: 'check' | 'apply') => async (_req: Request, res: Response) => {
+    const status = updater.getStatus()
+    if (!status.supported) return res.status(503).json({ error: 'Updates are not set up on this device' })
+    if (status.state !== 'idle') return res.status(409).json({ error: `Updater is busy (${status.state})` })
+    if (action === 'apply' && !status.available) return res.status(409).json({ error: 'No update available' })
+    try {
+      await updater.request(action)
+      res.status(202).json({ message: action === 'apply' ? 'Update started' : 'Check started' })
+    } catch (err: unknown) {
+      res.status(500).json({ error: (err as Error).message })
+    }
+  }
+  app.post('/api/update/check', requestUpdate('check'))
+  app.post('/api/update/apply', requestUpdate('apply'))
 
   // ---- WiFi provisioning (only meaningful when Pi is in AP mode) ----
 

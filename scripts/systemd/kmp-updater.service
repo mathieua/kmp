@@ -1,0 +1,14 @@
+[Unit]
+Description=KMP OTA updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+# Optional overrides: KMP_MANIFEST_URL, KMP_KEEP_RELEASES, ...
+EnvironmentFile=-/etc/kmp/updater.env
+ExecStart=/usr/bin/node /opt/kmp/bin/kmp-updater.js
+TimeoutStartSec=20min
+StandardOutput=journal
+StandardError=journal

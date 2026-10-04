@@ -4,6 +4,7 @@ import { LibraryPage } from './pages/LibraryPage'
 import { ImportPage } from './pages/ImportPage'
 import { UploadPage } from './pages/UploadPage'
 import { SyncPage } from './pages/SyncPage'
+import { UpdatesPage } from './pages/UpdatesPage'
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
         <Route path="import" element={<ImportPage />} />
         <Route path="upload" element={<UploadPage />} />
         <Route path="sync" element={<SyncPage />} />
+        <Route path="updates" element={<UpdatesPage />} />
       </Route>
     </Routes>
   )

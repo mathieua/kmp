@@ -1,4 +1,4 @@
-import type { MediaItem, ImportJob, YoutubePrefetch, UsbDevice, SyncDiff } from '../types/portal.types'
+import type { MediaItem, ImportJob, YoutubePrefetch, UsbDevice, SyncDiff, UpdateStatus } from '../types/portal.types'
 
 const BASE = '/api/portal'
 
@@ -99,4 +99,14 @@ export const portalApi = {
       xhr.onerror = () => reject(new Error('Network error'))
       xhr.send(formData)
     }),
+
+  // OTA updates (not under /portal: shared with the updater/health endpoints)
+  getUpdateStatus: () =>
+    fetch('/api/update-status').then(r => json<UpdateStatus>(r)),
+
+  checkForUpdate: () =>
+    fetch('/api/update/check', { method: 'POST' }).then(r => json<{ message: string }>(r)),
+
+  applyUpdate: () =>
+    fetch('/api/update/apply', { method: 'POST' }).then(r => json<{ message: string }>(r)),
 }
