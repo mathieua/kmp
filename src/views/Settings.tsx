@@ -3,7 +3,7 @@ import { Palette, Lang, Route, t, PALETTES, AppSettings } from '../App'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { HeaderActions } from '../components/HeaderActions'
 import { Slider } from '../components/Slider'
-import { useWifiConnection } from '../hooks/useStatus'
+import { useWifiConnection, useBattery } from '../hooks/useStatus'
 
 interface SettingsProps {
   palette: Palette
@@ -51,6 +51,7 @@ function Chip({ active, accent, onClick, children }: { active: boolean; accent: 
 
 export function Settings({ palette, lang, settings, onSettings, onNavigate, onBack, onRenameDevice }: SettingsProps) {
   const wifi = useWifiConnection()
+  const battery = useBattery()
   const [defaultVolume, setDefaultVolume] = useState<number | null>(null)
 
   useEffect(() => {
@@ -100,6 +101,12 @@ export function Settings({ palette, lang, settings, onSettings, onNavigate, onBa
         <Row title={t(lang, 'wifi')} hint={wifi.connected ? `${t(lang, 'connectedTo')} ${wifi.ssid}` : t(lang, 'notConnected')}>
           <Chip accent={palette.accentPlay} active={false} onClick={() => onNavigate('wifi')}>{t(lang, 'changeNetwork')}</Chip>
         </Row>
+
+        {battery && (
+          <Row title={t(lang, 'battery')} hint={`${Math.round(battery.level)}% · ${t(lang, battery.state)}`}>
+            <Chip accent={palette.accentPlay} active={false} onClick={() => onNavigate('battery')}>{t(lang, 'batteryDetails')}</Chip>
+          </Row>
+        )}
 
         <Row title={t(lang, 'language')}>
           <Chip accent={palette.accentPlay} active={settings.lang === 'en'} onClick={() => set('lang', 'en')}>English</Chip>

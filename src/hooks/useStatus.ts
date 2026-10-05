@@ -18,4 +18,4 @@ export const useWifiConnection = (): WifiConnection =>
 
 /** null = no battery on this unit. */
 export const useBattery = (): BatteryStatus | null =>
-  usePolled(() => window.electronAPI.device.getBattery(), null, 30_000)
+  usePolled(() => window.electronAPI.device.getBattery(), null, 5_000)

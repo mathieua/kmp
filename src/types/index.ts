@@ -79,6 +79,12 @@ export interface WifiConnection {
 export interface BatteryStatus {
   level: number    // 0-100
   charging: boolean
+  state: 'charging' | 'discharging' | 'full' | 'idle'
+  voltage: number  // V
+  current: number  // A, positive = charging
+  power: number    // W, absolute
+  externalPower: boolean
+  minutesRemaining: number | null  // to empty (discharging) or full (charging)
 }
 
 export interface Alarm {
