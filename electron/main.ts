@@ -5,6 +5,7 @@ import { AlarmService } from './services/alarm'
 import { HardwareService } from './services/hardware'
 import { createApiService } from './services/api'
 import { WifiService } from './services/wifi'
+import { PowerGuard } from './services/powerGuard'
 import { DeviceService } from './services/device'
 import { LibraryService } from './services/library'
 import { ensureAlarmSounds } from './services/alarmSounds'
@@ -299,6 +300,7 @@ app.whenReady().then(() => {
 
   setupAudioService()
   setupAlarmService()
+  new PowerGuard(deviceService.battery, alarmService).start()
 
   // Hardware integration: only active in production (Pi).
   // In dev the socket connections will silently retry and the sysfs/GPIO
