@@ -1,6 +1,7 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import * as os from 'os'
+import * as path from 'path'
 import { BatteryService, BatteryStatus } from './battery'
 import { isHostnameOnboarded, setHostnameOnboarded } from './database'
 
@@ -13,9 +14,11 @@ const HOSTNAME_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
 export type { BatteryStatus }
 
 export class DeviceService {
-  readonly battery = new BatteryService()
+  readonly battery: BatteryService
 
-  constructor() {
+  /** @param dataDir where the battery history CSV is kept */
+  constructor(dataDir?: string) {
+    this.battery = new BatteryService(dataDir ? path.join(dataDir, 'battery-log.csv') : undefined)
     this.battery.start()
   }
 

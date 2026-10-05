@@ -11,6 +11,7 @@
 
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import * as fs from 'fs'
 
 const execFileAsync = promisify(execFile)
 
@@ -22,6 +23,9 @@ const REG_BUS = '0x02'
 const POLL_MS = 5_000
 const WINDOW = 6                 // samples averaged (~30 s)
 const MAX_FAILURES = 3           // consecutive failed polls before "no UPS"
+const LOG_EVERY_MS = 60_000
+const LOG_MAX_BYTES = 2 * 1024 * 1024   // rotate to <file>.1 beyond this
+const LOG_HEADER = 'timestamp,voltage_raw,current_raw,voltage_avg,current_avg,level,state\n'
 const SHUNT_OHMS = 0.1           // Model B
 const CURRENT_DEADBAND_A = 0.05  // |I| below this counts as idle
 const FULL_LEVEL = 99
@@ -76,6 +80,10 @@ export class BatteryService {
   private state: BatteryState = 'idle'
   private level: number | null = null
   private listeners = new Set<(s: BatteryStatus | null) => void>()
+  private lastLog = 0
+
+  /** @param logPath optional CSV file for charge/discharge history (one row a minute). */
+  constructor(private logPath?: string) {}
 
   start(): void {
     if (this.timer) return
@@ -158,6 +166,27 @@ export class BatteryService {
       minutesRemaining: minutesRemaining === null ? null : Math.round(minutesRemaining),
     }
     this.emit()
+    this.log(v, i, voltage, current)
+  }
+
+  // Calibration data: lets us fit the real capacity and discharge curve later.
+  private log(vRaw: number, iRaw: number, vAvg: number, iAvg: number): void {
+    if (!this.logPath || !this.status) return
+    const now = Date.now()
+    if (now - this.lastLog < LOG_EVERY_MS) return
+    this.lastLog = now
+    try {
+      if (fs.existsSync(this.logPath) && fs.statSync(this.logPath).size > LOG_MAX_BYTES) {
+        fs.renameSync(this.logPath, `${this.logPath}.1`)
+      }
+      if (!fs.existsSync(this.logPath)) fs.writeFileSync(this.logPath, LOG_HEADER)
+      fs.appendFileSync(this.logPath, [
+        new Date(now).toISOString(), vRaw.toFixed(3), iRaw.toFixed(3),
+        vAvg.toFixed(3), iAvg.toFixed(3), this.status.level.toFixed(1), this.status.state,
+      ].join(',') + '\n')
+    } catch {
+      // logging must never break monitoring
+    }
   }
 
   private emit(): void {

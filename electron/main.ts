@@ -279,7 +279,7 @@ app.whenReady().then(() => {
   )
 
   // Device IPC handlers (requires the DB, initialized inside createApiService above)
-  deviceService = new DeviceService()
+  deviceService = new DeviceService(dataDir)
   ipcMain.handle('device:getBattery', () => deviceService.getBattery())
   ipcMain.handle('device:getHostname', () => deviceService.getHostname())
   ipcMain.handle('device:isOnboarded', () => deviceService.isOnboarded())
