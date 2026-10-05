@@ -23,7 +23,7 @@ const crypto = require('crypto')
 const http = require('http')
 const { execFileSync, spawnSync } = require('child_process')
 
-const DEFAULT_MANIFEST = 'https://api.github.com/repos/mathieua/kids-alarm/releases/latest'
+const DEFAULT_MANIFEST = 'https://api.github.com/repos/mathieua/kmp/releases/latest'
 
 function loadConfig(env = process.env) {
   const root = env.KMP_ROOT || '/opt/kmp'

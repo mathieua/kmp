@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # One-time OS config for units with the MAX98357 I2S amp (hifiberry-dac
 # overlay + GPIO16 SD_MODE control, driven by amp_control.py). NOT for
-# units with a USB speaker (e.g. Leo's clock) — running this there would
-# override ALSA's default device to a nonexistent I2S card.
+# units with a USB speaker — running this there would override ALSA's
+# default device to a nonexistent I2S card.
 #
 # Audio routes through PipeWire rather than plain ALSA softvol. Softvol's
 # "Master"/"PCM" control turned out to be a dead end for this use case: it's
@@ -35,6 +35,19 @@ else
     echo "  Added dtoverlay=hifiberry-dac"
 fi
 
+# With the onboard audio enabled, WirePlumber picks the headphone jack as the
+# default sink on a fresh image, so nothing plays through the amp. Turning
+# the onboard audio off leaves the amp as the only sink — no per-device
+# `wpctl set-default` needed.
+echo "→ Disabling onboard audio so the amp is the only (and default) sink"
+if grep -q '^dtparam=audio=on' "$CONFIG_TXT"; then
+    sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CONFIG_TXT"
+    echo "  dtparam=audio=on → off"
+elif ! grep -q '^dtparam=audio=off' "$CONFIG_TXT"; then
+    echo 'dtparam=audio=off' >> "$CONFIG_TXT"
+    echo "  Added dtparam=audio=off"
+fi
+
 echo "→ Installing PipeWire"
 apt-get install -y pipewire pipewire-alsa wireplumber
 
@@ -55,12 +68,7 @@ EOF
 echo ""
 echo "Done."
 echo ""
-echo "IMPORTANT: reboot for dtoverlay=hifiberry-dac to take effect. Then, once"
-echo "back up, pick the hifiberry sink as PipeWire's default (WirePlumber"
-echo "persists this choice in ~/.local/state/wireplumber/default-nodes, so"
-echo "it only needs doing once):"
-echo "  wpctl status                              # find the sink id for"
-echo "                                             # 'snd_rpi_hifiberry_dac'"
-echo "                                             # (via: wpctl inspect <id> | grep alsa.card_name)"
-echo "  wpctl set-default <id>"
-echo "  wpctl set-volume @DEFAULT_AUDIO_SINK@ 70% # sanity check"
+echo "IMPORTANT: reboot for the config.txt changes to take effect. Then check"
+echo "the hifiberry sink is the default (marked *):"
+echo "  wpctl status"
+echo "  wpctl set-volume @DEFAULT_AUDIO_SINK@ 70%   # sanity check"

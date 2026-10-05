@@ -30,7 +30,7 @@ before every update.
 
 Override the manifest or retention in `/etc/kmp/updater.env`
 (`KMP_MANIFEST_URL`, `KMP_KEEP_RELEASES`, ...). Default manifest:
-`https://api.github.com/repos/mathieua/kids-alarm/releases/latest`.
+`https://api.github.com/repos/mathieua/kmp/releases/latest`.
 
 ## Update sequence
 

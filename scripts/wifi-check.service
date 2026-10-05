@@ -8,7 +8,9 @@ Description=Kids Clock — WiFi provisioning check
 # the setup screen, with AP mode only appearing seconds later unnoticed.
 After=NetworkManager.service
 Wants=NetworkManager.service
-Before=multi-user.target getty@tty1.service
+# kmp-backend.service (OTA layout) replaces the getty/startx launch and has
+# the same race, so order before it too.
+Before=multi-user.target getty@tty1.service kmp-backend.service
 
 [Service]
 Type=oneshot

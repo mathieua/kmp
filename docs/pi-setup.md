@@ -69,28 +69,33 @@ ssh pi@alarm-clock.local
 
 ## 4. Run the Setup Script
 
-From your Mac, copy the setup script to the Pi and run it. Use `nohup` so it survives SSH disconnects (it takes ~10 minutes):
+Fresh Raspberry Pi OS images no longer give `pi` passwordless sudo, and the script runs
+unattended under `nohup` (~10 minutes). Allow passwordless sudo **for the bring-up only**
+(removed in step 7):
+
+```bash
+ssh -t pi@alarm-clock.local "echo 'pi ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/099_bringup-temp"
+```
+
+Then copy the setup script to the Pi and run it:
 
 ```bash
 scp scripts/setup-pi.sh pi@alarm-clock.local:~/
-ssh pi@alarm-clock.local "nohup bash ~/setup-pi.sh > ~/setup.log 2>&1 &"
+ssh pi@alarm-clock.local "nohup bash ~/setup-pi.sh > ~/setup.log 2>&1 < /dev/null &"
 # Monitor progress:
 ssh pi@alarm-clock.local "tail -f ~/setup.log"
 ```
 
 This installs:
-- X11 minimal desktop
-- Node.js 20 LTS
-- Chromium + Electron dependencies
-- I2C tools (for RTC and light sensor)
+- X11 minimal desktop, Chromium/Electron dependencies, Node.js 20 LTS
+- I2C tools, `lgpio`, the BH1750 library and `hwclock` (`util-linux-extra`)
 - `yt-dlp` (for YouTube import)
-- USB audio as default ALSA output (`~/.asoundrc`)
-- Configures GPU memory, I2C, touchscreen rotation, and auto-login
+- Configures GPU memory, I2C, the DS3231 RTC overlay, touchscreen rotation and auto-login
 
-Reboot after it completes:
-```bash
-sudo reboot
-```
+It skips the WiFi fallback service until the app is deployed — re-run it after step 5.
+
+> **Power:** keep the UPS on its charger during bring-up. On battery alone, sustained
+> 4-core load (the system upgrade, the native module compile) has frozen the Pi.
 
 ---
 
@@ -103,49 +108,77 @@ From your Mac, in the project root:
 npm run build
 
 # Copy to Pi (excludes node_modules — these must be installed on-device for ARM)
-rsync -av --exclude node_modules --exclude .git . pi@alarm-clock.local:~/alarm-clock/
+rsync -a --exclude node_modules --exclude .git --exclude data --exclude out --exclude hw/pcb . pi@alarm-clock.local:~/alarm-clock/
 
-# Install dependencies on Pi (use nohup — downloads ARM Electron binary, takes a few minutes)
-ssh pi@alarm-clock.local "cd ~/alarm-clock && nohup npm install > ~/npm-install.log 2>&1 &"
+# Install dependencies on Pi (downloads the ARM Electron binary and compiles better-sqlite3)
+ssh pi@alarm-clock.local "cd ~/alarm-clock && nohup npm install > ~/npm-install.log 2>&1 < /dev/null &"
 ssh pi@alarm-clock.local "tail -f ~/npm-install.log"  # monitor progress
-
-# Reboot to auto-start
-ssh pi@alarm-clock.local "sudo reboot"
 ```
 
-The app auto-starts on every boot via `~/.xinitrc` → `NODE_ENV=production npm start`.
+The `postinstall` rebuild hides failures (`|| true`). Check it produced the native module:
 
-> **Note:** `NODE_ENV=production` is required — without it Electron tries to connect to the Vite dev server at `localhost:5173` and shows a blank page.
+```bash
+ssh pi@alarm-clock.local "ls ~/alarm-clock/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+# If missing: ssh pi@alarm-clock.local "cd ~/alarm-clock && JOBS=1 npx electron-rebuild -f -w better-sqlite3"
+```
+
+Then re-run `setup-pi.sh` (enables `wifi-check.service`).
 
 ---
 
-## 6. Hardware Notes
+## 6. Hardware and Services
+
+All run on the Pi from `~/alarm-clock`:
+
+```bash
+sudo bash hw/install-amp.sh      # I2S amp overlay, onboard audio off, PipeWire
+sudo bash scripts/install-ota.sh # /opt/kmp layout, kmp-backend + nightly updater (see docs/ota-updates.md)
+sudo bash hw/install.sh          # kmp-buttons / kmp-encoder daemons
+sudo reboot
+```
+
+After the reboot, check:
+
+```bash
+systemctl is-active kmp-backend kmp-buttons kmp-encoder wifi-check
+curl -s localhost:3000/api/health     # {"ok":true,"version":"..."}
+wpctl status                          # hifiberry sink present and default (*)
+sudo i2cdetect -y 1                   # see table below
+```
 
 ### I2C Devices
 
 | Device | Address | Purpose |
 |--------|---------|---------|
-| DS3231 RTC | `0x68` | Real-time clock (prevents time loss on power cycle) |
-| BH1750 Light Sensor | `0x23` | Ambient light → auto screen dimming |
+| BH1750 light sensor | `0x23` | Ambient light → auto screen dimming |
+| Waveshare UPS HAT (B) — INA219 | `0x42` | Battery voltage/current → battery icon, low-battery shutdown |
+| DS3231 RTC | `0x68` | Real-time clock (shows as `UU` once the kernel driver claims it) |
 
-Verify I2C devices are detected after connecting hardware:
-```bash
-sudo i2cdetect -y 1
-```
+Every part is optional at runtime: a missing sensor, button or amp just disables that feature.
 
 ### GPIO Pin Assignments
 
-| Function | GPIO Pin |
-|----------|----------|
-| Play/Pause | 17 |
-| Next | 27 |
-| Previous | 22 |
-| Snooze/Dismiss | 23 |
-| Rotary Encoder CLK | 5 |
-| Rotary Encoder DT | 6 |
-| Rotary Encoder SW | 13 |
-| I2C SDA | 2 |
-| I2C SCL | 3 |
+| Function | GPIO |
+|----------|------|
+| Play/Pause button | 12 |
+| Skip button | 6 |
+| Previous button | 13 |
+| Rotary encoder CLK / DT / SW | 17 / 27 / 22 |
+| Amp SD_MODE (enable) | 16 |
+| I2S (amp) BCLK / LRCLK / DIN | 18 / 19 / 21 |
+| LED | 26 |
+| I2C SDA / SCL | 2 / 3 |
+
+---
+
+## 7. Finish
+
+Remove the temporary sudo rule. The app's own rules (`/etc/sudoers.d/alarm-clock`,
+`/etc/sudoers.d/kmp-updater`) stay:
+
+```bash
+ssh pi@alarm-clock.local "sudo rm /etc/sudoers.d/099_bringup-temp"
+```
 
 ---
 
@@ -169,11 +202,12 @@ If the Pi can't find a known network, it will enter **AP provisioning mode**:
 - SSH by IP if mDNS fails: `ssh pi@<ip-address>`
 
 ### Wrong time after power loss
-The Pi has no hardware clock — time resets on power loss until the DS3231 RTC is installed and synced:
+The Pi has no hardware clock of its own — without network, time is wrong after power loss unless the DS3231 RTC is connected and synced:
 ```bash
 sudo hwclock --systohc   # Write system time to RTC
 sudo hwclock --hctosys   # Read RTC back to system (on boot)
 ```
 
 ### App doesn't auto-start
-Check that `~/.xinitrc` exists and `startx` is in `~/.bashrc`. Re-run `setup-pi.sh` if needed.
+Check `systemctl status kmp-backend` and `journalctl -u kmp-backend -b`. On devices not yet
+converted to the OTA layout, the app starts from `~/.xinitrc` via `startx` in `~/.bashrc`.

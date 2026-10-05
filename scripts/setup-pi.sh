@@ -14,6 +14,24 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
+# Fresh Raspberry Pi OS images no longer give the pi user passwordless sudo,
+# and this script runs for ~10 minutes (usually under nohup, with no tty to
+# prompt on). Cache credentials up front and keep them alive, or bail out
+# with instructions rather than failing halfway through.
+if ! sudo -n true 2>/dev/null; then
+    if [ -t 0 ]; then
+        sudo -v
+        while true; do sudo -n true; sleep 50; kill -0 "$$" 2>/dev/null || exit; done 2>/dev/null &
+    else
+        echo "sudo needs a password and there is no terminal to ask on."
+        echo "Either run this script interactively (ssh -t ...), or temporarily allow"
+        echo "passwordless sudo for the bring-up and remove it afterwards:"
+        echo "  echo 'pi ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/099_bringup-temp"
+        echo "  ...run setup...  then: sudo rm /etc/sudoers.d/099_bringup-temp"
+        exit 1
+    fi
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -70,7 +88,8 @@ sudo apt install -y \
 
 # Step 5: Install I2C tools and hardware driver dependencies
 print_step "Installing I2C tools and hardware dependencies..."
-sudo apt install -y i2c-tools python3-smbus python3-lgpio
+# util-linux-extra provides hwclock, which Debian 13 (trixie) no longer ships by default
+sudo apt install -y i2c-tools python3-smbus python3-lgpio util-linux-extra
 sudo pip3 install smbus2 adafruit-circuitpython-bh1750 --break-system-packages
 
 # Step 6: Install Node.js 20 LTS
@@ -121,7 +140,13 @@ if ! grep -q "^gpu_mem=" "$BOOT_CONFIG" 2>/dev/null; then
     echo "gpu_mem=128" | sudo tee -a "$BOOT_CONFIG"
 fi
 
-# Step 9: Configure display for official 7" touchscreen
+# DS3231 RTC on the I2C bus (0x68)
+if ! grep -q "^dtoverlay=i2c-rtc,ds3231" "$BOOT_CONFIG"; then
+    echo "Enabling DS3231 RTC overlay..."
+    echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a "$BOOT_CONFIG"
+fi
+
+# Step 9: Configure display (official 7" v1 / Waveshare 5" DSI)
 print_step "Configuring display settings..."
 
 # Determine config file location (varies by Pi OS version)
@@ -138,7 +163,7 @@ fi
 if ! grep -q "lcd_rotate" "$CONFIG_FILE"; then
     echo "Configuring touchscreen for landscape mode..."
     echo "" | sudo tee -a "$CONFIG_FILE"
-    echo "# Official 7\" touchscreen - landscape orientation" | sudo tee -a "$CONFIG_FILE"
+    echo "# DSI touchscreen (official 7\" v1 / Waveshare 5\") - landscape orientation" | sudo tee -a "$CONFIG_FILE"
     echo "lcd_rotate=2" | sudo tee -a "$CONFIG_FILE"
 fi
 
@@ -181,18 +206,13 @@ fi
 EOF
 fi
 
-# Step 14: Configure USB audio as default output
-print_step "Configuring USB audio as default output..."
-# USB speaker will be card 1 (card 0 is onboard headphones)
-# This sets ALSA defaults so Electron/ffmpeg route to USB speaker automatically
-if ! grep -q "defaults.pcm.card" ~/.asoundrc 2>/dev/null; then
-    cat > ~/.asoundrc << 'EOF'
-defaults.pcm.card 1
-defaults.ctl.card 1
-EOF
-    echo "USB audio set as default (card 1)"
-else
-    echo "~/.asoundrc already configured"
+# Step 14: Audio
+# Audio goes through the I2S amp, configured by hw/install-amp.sh. Remove the
+# ~/.asoundrc earlier versions of this script wrote for the old USB speaker —
+# it pins ALSA to card 1, which is no longer the speaker.
+if grep -q "defaults.pcm.card" ~/.asoundrc 2>/dev/null; then
+    rm ~/.asoundrc
+    echo "Removed stale USB-speaker ~/.asoundrc"
 fi
 
 # Step 15: Install WiFi provisioning service
@@ -210,16 +230,17 @@ if ! sudo grep -q "sbin/shutdown" "$SUDOERS_FILE" 2>/dev/null; then
     echo "Sudoers entry written to $SUDOERS_FILE"
 fi
 
-chmod +x ~/alarm-clock/scripts/set-hostname.sh
-
-# Make the check script executable
-chmod +x ~/alarm-clock/scripts/wifi-check.sh
-
-# Install and enable the systemd service
-sudo cp ~/alarm-clock/scripts/wifi-check.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable wifi-check.service
-echo "wifi-check.service enabled."
+# The rest needs the app checked out at ~/alarm-clock. On a fresh device this
+# script normally runs before the app is deployed — re-run it afterwards.
+if [ -f ~/alarm-clock/scripts/wifi-check.service ]; then
+    chmod +x ~/alarm-clock/scripts/set-hostname.sh ~/alarm-clock/scripts/wifi-check.sh
+    sudo cp ~/alarm-clock/scripts/wifi-check.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable wifi-check.service
+    echo "wifi-check.service enabled."
+else
+    print_warning "~/alarm-clock not deployed yet — deploy the app, then re-run this script to enable wifi-check.service"
+fi
 
 # Step 16: Verify I2C
 print_step "Verifying I2C configuration..."
@@ -236,11 +257,11 @@ echo "=========================================="
 echo -e "${GREEN}Setup complete!${NC}"
 echo "=========================================="
 echo ""
-echo "Next steps:"
+echo "Next steps (see docs/pi-setup.md):"
 echo "1. Reboot: sudo reboot"
-echo "2. After reboot, clone/copy the alarm-clock project to ~/alarm-clock"
-echo "3. Run 'npm install' in the project directory"
-echo "4. The app should auto-start on next boot"
+echo "2. Deploy the app to ~/alarm-clock and run 'npm install' there"
+echo "3. Re-run this script to enable the WiFi fallback service"
+echo "4. Run hw/install-amp.sh, scripts/install-ota.sh, hw/install.sh, then reboot"
 echo ""
 echo "To manually start X11: startx"
 echo "To test I2C devices: sudo i2cdetect -y 1"
