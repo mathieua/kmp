@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom'
 import { useImportJobs } from '../../hooks/useImportJobs'
+import { useUpdateStatus } from '../../hooks/useUpdateStatus'
 
 export function PortalNav() {
   const { activeCount, isOpen, togglePanel } = useImportJobs()
+  const { status: update } = useUpdateStatus()
 
   return (
     <nav style={styles.nav}>
@@ -19,6 +21,9 @@ export function PortalNav() {
         </NavLink>
         <NavLink to="/portal/sync" style={({ isActive }) => ({ ...styles.link, ...(isActive ? styles.activeLink : {}) })}>
           Sync
+        </NavLink>
+        <NavLink to="/portal/updates" style={({ isActive }) => ({ ...styles.link, ...(isActive ? styles.activeLink : {}) })}>
+          Updates {update?.available && <span style={styles.badge}>1</span>}
         </NavLink>
         <button onClick={togglePanel} style={styles.jobsBtn}>
           Jobs {activeCount > 0 && <span style={styles.badge}>{activeCount}</span>}

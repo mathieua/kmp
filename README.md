@@ -15,6 +15,7 @@ A Raspberry Pi-based alarm clock for kids with a touchscreen UI and a parent por
 - YouTube import — paste a URL, downloads as MP3 with metadata and thumbnail
 - File upload — drag and drop MP3 files
 - USB Sync — diff view, orphan management, progress tracking
+- Software updates — over-the-air updates with rollback (see [docs/ota-updates.md](docs/ota-updates.md))
 
 ## Hardware
 

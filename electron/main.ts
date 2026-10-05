@@ -83,9 +83,10 @@ function clearAlarmTimers() {
 }
 
 function setupAudioService() {
-  const mediaDir = isKiosk
-    ? path.join(app.getPath('home'), 'alarm-clock/media')
-    : path.join(__dirname, '../../media')
+  const mediaDir = process.env.KMP_MEDIA_DIR
+    ?? (isKiosk
+      ? path.join(app.getPath('home'), 'alarm-clock/media')
+      : path.join(__dirname, '../../media'))
 
   audioService = new AudioService(mediaDir)
   libraryService = new LibraryService(audioService, mediaDir)
@@ -249,12 +250,16 @@ app.whenReady().then(() => {
     return net.fetch('file://' + filePath)
   })
 
-  const mediaDir = isKiosk
-    ? path.join(app.getPath('home'), 'alarm-clock/media')
-    : path.join(__dirname, '../../media')
-  const dataDir = isKiosk
-    ? path.join(app.getPath('home'), 'alarm-clock/data')
-    : path.join(__dirname, '../../data')
+  const mediaDir = process.env.KMP_MEDIA_DIR
+    ?? (isKiosk
+      ? path.join(app.getPath('home'), 'alarm-clock/media')
+      : path.join(__dirname, '../../media'))
+  // OTA layout (kmp-backend.service) points these at the writable /opt/kmp
+  // mount; the defaults keep pre-OTA devices and dev machines working.
+  const dataDir = process.env.KMP_DATA_DIR
+    ?? (isKiosk
+      ? path.join(app.getPath('home'), 'alarm-clock/data')
+      : path.join(__dirname, '../../data'))
   fs.mkdirSync(dataDir, { recursive: true })
   alarmSounds = ensureAlarmSounds(path.join(dataDir, 'alarm-sounds'))
 

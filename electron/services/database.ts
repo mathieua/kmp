@@ -37,7 +37,7 @@ export interface ImportJob {
 
 let db: Database.Database
 
-export function initDatabase(dataDir: string): void {
+export function initDatabase(dataDir: string, migrationsDir?: string): void {
   const dbPath = path.join(dataDir, 'portal.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
@@ -120,6 +120,12 @@ export function initDatabase(dataDir: string): void {
     // Column already exists — no-op
   }
 
+  // Per-release migrations (migrations/NNN-name.sql, shipped inside the
+  // release). Each runs once, in order, in a transaction; a failure throws,
+  // the backend fails its post-update health check, and the OTA updater
+  // rolls back both the code and the pre-update DB snapshot.
+  if (migrationsDir) runMigrations(migrationsDir)
+
   // Seed the device row once. Existing devices (already named before this
   // feature shipped, e.g. leo-clock) are marked onboarded immediately so
   // they're never prompted — only names still matching the factory pattern
@@ -128,6 +134,21 @@ export function initDatabase(dataDir: string): void {
   if (!existing) {
     const looksFactory = /^kmp(-.*)?$/i.test(os.hostname())
     db.prepare('INSERT INTO device (id, hostname_onboarded) VALUES (1, ?)').run(looksFactory ? 0 : 1)
+  }
+}
+
+function runMigrations(dir: string): void {
+  db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT (datetime(\'now\')))')
+  if (!fs.existsSync(dir)) return
+  const applied = new Set((db.prepare('SELECT name FROM schema_migrations').all() as { name: string }[]).map(r => r.name))
+  const pending = fs.readdirSync(dir).filter(f => f.endsWith('.sql') && !applied.has(f)).sort()
+  for (const file of pending) {
+    const sql = fs.readFileSync(path.join(dir, file), 'utf8')
+    db.transaction(() => {
+      db.exec(sql)
+      db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(file)
+    })()
+    console.log(`[DB] applied migration ${file}`)
   }
 }
 
