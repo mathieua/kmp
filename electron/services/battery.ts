@@ -26,9 +26,9 @@ const SHUNT_OHMS = 0.1           // Model B
 const CURRENT_DEADBAND_A = 0.05  // |I| below this counts as idle
 const FULL_LEVEL = 99
 const FULL_CURRENT_A = 0.1
-// 2S pack of 2x18650 (~3000 mAh each at 7.4 V nominal). Only used for the
-// time-remaining estimate.
-const PACK_WH = 22
+// 2S pack of 2x18650, 3400 mAh each at 7.4 V nominal (~25.2 Wh). Only used
+// for the time-remaining estimate.
+const PACK_WH = 3.4 * 7.4
 
 export type BatteryState = 'charging' | 'discharging' | 'full' | 'idle'
 
