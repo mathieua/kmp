@@ -300,6 +300,7 @@ app.whenReady().then(() => {
 
   setupAudioService()
   setupAlarmService()
+  deviceService.battery.onUpdate(status => mainWindow?.webContents.send('battery:update', status))
   new PowerGuard(deviceService.battery, alarmService).start()
 
   // Hardware integration: only active in production (Pi).

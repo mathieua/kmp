@@ -103,6 +103,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Device identity / OOBE
   device: {
     getBattery: () => ipcRenderer.invoke('device:getBattery'),
+    onBattery: (callback: (status: unknown) => void) => {
+      const listener = (_: unknown, status: unknown) => callback(status)
+      ipcRenderer.on('battery:update', listener)
+      return () => ipcRenderer.removeListener('battery:update', listener)
+    },
     getHostname: () => ipcRenderer.invoke('device:getHostname'),
     isOnboarded: () => ipcRenderer.invoke('device:isOnboarded'),
     validateHostname: (name: string) => ipcRenderer.invoke('device:validateHostname', name),

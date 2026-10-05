@@ -108,6 +108,7 @@ export interface ElectronAPI {
   }
   device: {
     getBattery: () => Promise<BatteryStatus | null>
+    onBattery: (callback: (status: BatteryStatus | null) => void) => () => void
     getHostname: () => Promise<string>
     isOnboarded: () => Promise<boolean>
     validateHostname: (name: string) => Promise<string | null>
