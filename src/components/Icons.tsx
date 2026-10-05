@@ -153,13 +153,13 @@ export const IconWifiOff = (p: IconProps) => (
 )
 
 /** `level` 0-100; shows a bolt when charging. */
-export const IconBattery = ({ level = 100, charging = false, ...p }: IconProps & { level?: number; charging?: boolean }) => {
+export const IconBattery = ({ level = 100, charging = false, color, ...p }: IconProps & { level?: number; charging?: boolean; color?: string }) => {
   const w = Math.max(0, Math.min(100, level)) / 100 * 13
   return (
-    <Icon {...p}>
+    <Icon {...p} stroke={color ?? 'currentColor'}>
       <rect x="2" y="7" width="17" height="10" rx="2.5"/>
       <path d="M22 11v2"/>
-      <rect x="4" y="9" width={w} height="6" rx="1" fill="currentColor" stroke="none"
+      <rect x="4" y="9" width={w} height="6" rx="1" fill={color ?? 'currentColor'} stroke="none"
         opacity={level <= 15 && !charging ? 0.9 : 1}/>
       {charging && <path d="M11.5 8.5 9 12.5h3.5L10.5 16" stroke="#000" strokeWidth="1.6" opacity="0.55"/>}
     </Icon>

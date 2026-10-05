@@ -1,6 +1,8 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import * as os from 'os'
+import * as path from 'path'
+import { BatteryService, BatteryStatus } from './battery'
 import { isHostnameOnboarded, setHostnameOnboarded } from './database'
 
 const execAsync = promisify(exec)
@@ -9,20 +11,20 @@ const execAsync = promisify(exec)
 // chars, can't start or end with a hyphen.
 const HOSTNAME_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
 
-export interface BatteryStatus {
-  /** 0-100 */
-  level: number
-  charging: boolean
-}
+export type { BatteryStatus }
 
 export class DeviceService {
-  /**
-   * Battery reading, or null when this unit has no battery hardware.
-   * TODO: read the real fuel gauge here once the battery is installed.
-   * The UI hides the battery icon while this returns null.
-   */
+  readonly battery: BatteryService
+
+  /** @param dataDir where the battery history CSV is kept */
+  constructor(dataDir?: string) {
+    this.battery = new BatteryService(dataDir ? path.join(dataDir, 'battery-log.csv') : undefined)
+    this.battery.start()
+  }
+
+  /** Battery reading, or null when this unit has no UPS (the UI hides the icon). */
   async getBattery(): Promise<BatteryStatus | null> {
-    return null
+    return this.battery.get()
   }
 
   getHostname(): string {

@@ -44,6 +44,23 @@ export class AlarmService extends EventEmitter {
     this.emit('dismissed')
   }
 
+  /** True while an alarm is ringing or snoozed (about to ring again). */
+  isBusy(): boolean {
+    return this.alarmActive || (this.snoozeUntil !== null && new Date() < this.snoozeUntil)
+  }
+
+  /** Minutes until the next enabled alarm fires, or null if none is set. */
+  minutesUntilNext(): number | null {
+    const alarm = getAlarm()
+    if (!alarm || !alarm.enabled) return null
+    const [h, m] = alarm.time.split(':').map(Number)
+    const now = new Date()
+    const next = new Date(now)
+    next.setHours(h, m, 0, 0)
+    if (next <= now) next.setDate(next.getDate() + 1)
+    return (next.getTime() - now.getTime()) / 60_000
+  }
+
   private check(): void {
     if (this.alarmActive) return
 

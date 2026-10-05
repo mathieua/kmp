@@ -204,8 +204,8 @@ print_step "Installing WiFi provisioning service..."
 # reconfiguration or a device rename; set-hostname.sh is scoped to just
 # "rename this device" rather than granting broad file-editing sudo access.
 SUDOERS_FILE="/etc/sudoers.d/alarm-clock"
-if ! sudo grep -q "set-hostname.sh" "$SUDOERS_FILE" 2>/dev/null; then
-    echo "pi ALL=(ALL) NOPASSWD: /usr/bin/nmcli, /sbin/reboot, /home/pi/alarm-clock/scripts/set-hostname.sh" | sudo tee "$SUDOERS_FILE" > /dev/null
+if ! sudo grep -q "sbin/shutdown" "$SUDOERS_FILE" 2>/dev/null; then
+    echo "pi ALL=(ALL) NOPASSWD: /usr/bin/nmcli, /sbin/reboot, /sbin/shutdown, /home/pi/alarm-clock/scripts/set-hostname.sh" | sudo tee "$SUDOERS_FILE" > /dev/null
     sudo chmod 440 "$SUDOERS_FILE"
     echo "Sudoers entry written to $SUDOERS_FILE"
 fi

@@ -5,6 +5,7 @@ import { AlarmService } from './services/alarm'
 import { HardwareService } from './services/hardware'
 import { createApiService } from './services/api'
 import { WifiService } from './services/wifi'
+import { PowerGuard } from './services/powerGuard'
 import { DeviceService } from './services/device'
 import { LibraryService } from './services/library'
 import { ensureAlarmSounds } from './services/alarmSounds'
@@ -283,7 +284,7 @@ app.whenReady().then(() => {
   )
 
   // Device IPC handlers (requires the DB, initialized inside createApiService above)
-  deviceService = new DeviceService()
+  deviceService = new DeviceService(dataDir)
   ipcMain.handle('device:getBattery', () => deviceService.getBattery())
   ipcMain.handle('device:getHostname', () => deviceService.getHostname())
   ipcMain.handle('device:isOnboarded', () => deviceService.isOnboarded())
@@ -304,6 +305,8 @@ app.whenReady().then(() => {
 
   setupAudioService()
   setupAlarmService()
+  deviceService.battery.onUpdate(status => mainWindow?.webContents.send('battery:update', status))
+  new PowerGuard(deviceService.battery, alarmService).start()
 
   // Hardware integration: only active in production (Pi).
   // In dev the socket connections will silently retry and the sysfs/GPIO

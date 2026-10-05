@@ -7,6 +7,7 @@ import { Settings } from './views/Settings'
 import { DimmedClock } from './views/DimmedClock'
 import { WifiSetup } from './views/WifiSetup'
 import { WifiSettings } from './views/WifiSettings'
+import { BatterySettings } from './views/BatterySettings'
 import { Onboarding } from './views/Onboarding'
 import { useAlarm } from './hooks/useAlarm'
 import { usePlayback } from './hooks/useAudio'
@@ -78,6 +79,9 @@ export const STRINGS = {
     defaultVolumeHint: 'Starting volume, and the loudest the alarm gets',
     sound: 'Alarm sound', randomSong: 'Random song', alarmSounds: 'Alarm sounds',
     yourSongs: 'Songs', tapToChange: 'Tap to change', playMusic: 'Play music',
+    battery: 'Battery', batteryDetails: 'Details', level: 'Level', state: 'State', charging: 'Charging', discharging: 'On battery', full: 'Full', idle: 'Idle',
+    voltage: 'Voltage', current: 'Current', power: 'Power', externalPower: 'External power', yes: 'Connected', no: 'Not connected',
+    timeRemaining: 'Time remaining', timeToFull: 'Time to full', calculating: 'Calculating…', noBattery: 'No battery detected',
     snd_beep: 'Beep Beep', snd_chime: 'Morning Chime', snd_bird: 'Little Bird', snd_musicbox: 'Music Box',
   },
   fr: {
@@ -102,6 +106,9 @@ export const STRINGS = {
     defaultVolumeHint: 'Volume de départ, et le maximum de l\'alarme',
     sound: 'Son de l\'alarme', randomSong: 'Chanson au hasard', alarmSounds: 'Sons d\'alarme',
     yourSongs: 'Chansons', tapToChange: 'Touchez pour changer', playMusic: 'Lire de la musique',
+    battery: 'Batterie', batteryDetails: 'Détails', level: 'Niveau', state: 'État', charging: 'En charge', discharging: 'Sur batterie', full: 'Pleine', idle: 'Au repos',
+    voltage: 'Tension', current: 'Courant', power: 'Puissance', externalPower: 'Alimentation externe', yes: 'Branchée', no: 'Débranchée',
+    timeRemaining: 'Autonomie restante', timeToFull: 'Temps avant charge complète', calculating: 'Calcul…', noBattery: 'Aucune batterie détectée',
     snd_beep: 'Bip Bip', snd_chime: 'Carillon du matin', snd_bird: 'Petit oiseau', snd_musicbox: 'Boîte à musique',
   },
 } as const
@@ -154,7 +161,7 @@ function Stage({ children }: { children: React.ReactNode }) {
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
-export type Route = 'clock' | 'alarms' | 'library' | 'player' | 'settings' | 'wifi'
+export type Route = 'clock' | 'alarms' | 'library' | 'player' | 'settings' | 'wifi' | 'battery'
 
 // ── App ────────────────────────────────────────────────────────────────────
 function App() {
@@ -242,7 +249,7 @@ function App() {
   const wake = useCallback(() => setDimmed(false), [])
 
   const navigate = useCallback((r: Route) => {
-    if (r === 'settings') setReturnRoute(cur => (route === 'settings' || route === 'wifi' ? cur : route))
+    if (r === 'settings') setReturnRoute(cur => (route === 'settings' || route === 'wifi' || route === 'battery' ? cur : route))
     setRoute(r)
     setDimmed(false)
   }, [route])
@@ -312,6 +319,14 @@ function App() {
           )}
           {route === 'wifi' && (
             <WifiSettings
+              palette={palette}
+              lang={lang}
+              onBack={() => navigate('settings')}
+              onNavigate={navigate}
+            />
+          )}
+          {route === 'battery' && (
+            <BatterySettings
               palette={palette}
               lang={lang}
               onBack={() => navigate('settings')}

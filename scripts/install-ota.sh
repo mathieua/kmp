@@ -58,11 +58,14 @@ ln -sfn current/hw "$ROOT/hw"
 install -m 755 "$SRC/scripts/updater/kmp-updater.js" "$ROOT/bin/kmp-updater.js"
 install -m 644 "$SRC"/scripts/systemd/kmp-{updater.service,updater.timer,backend.service} /etc/systemd/system/
 
-# Parent portal may start the (root) updater; nothing else.
+# Parent portal may start the (root) updater; the app may rename the device
+# and shut down on low battery; nothing else.
 SUDOERS=/etc/sudoers.d/kmp-updater
 cat > "$SUDOERS.tmp" <<SUDO
 $APP_USER ALL=(root) NOPASSWD: /usr/bin/systemctl start --no-block kmp-updater.service
 $APP_USER ALL=(root) NOPASSWD: $ROOT/current/scripts/set-hostname.sh
+# Clean shutdown at critically low battery (electron/services/powerGuard.ts).
+$APP_USER ALL=(root) NOPASSWD: /sbin/shutdown
 SUDO
 visudo -cf "$SUDOERS.tmp" && chmod 440 "$SUDOERS.tmp" && mv "$SUDOERS.tmp" "$SUDOERS"
 
