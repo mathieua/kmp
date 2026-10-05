@@ -62,3 +62,13 @@ export interface SyncSummary {
 }
 
 export type SyncStatus = 'idle' | 'reviewing' | 'syncing' | 'complete' | 'error'
+
+export interface UpdateStatus {
+  currentVersion: string
+  supported: boolean
+  state: 'idle' | 'checking' | 'updating'
+  lastCheck: string | null
+  lastCheckError: string | null
+  available: { version: string; changelog: string; publishedAt: string | null } | null
+  lastResult: { status: 'success' | 'failed' | 'rolled_back'; version: string; message: string; at: string } | null
+}

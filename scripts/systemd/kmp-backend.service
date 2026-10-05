@@ -1,0 +1,28 @@
+[Unit]
+Description=KMP kiosk (Electron UI + portal backend)
+After=network.target systemd-user-sessions.service
+# Owns tty1 + X, replacing the getty autologin / ~/.xinitrc launch.
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+User=pi
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty
+TTYReset=yes
+TTYVHangup=yes
+Environment=NODE_ENV=production
+Environment=KMP_ROOT=/opt/kmp
+Environment=KMP_DATA_DIR=/opt/kmp/data
+Environment=KMP_MEDIA_DIR=/opt/kmp/media
+Environment=KMP_SET_HOSTNAME_SCRIPT=/opt/kmp/current/scripts/set-hostname.sh
+WorkingDirectory=/opt/kmp/current
+ExecStart=/usr/bin/xinit /opt/kmp/current/scripts/kmp-session.sh -- :0 vt1 -keeptty -nolisten tcp
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
