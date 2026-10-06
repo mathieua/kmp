@@ -11,3 +11,4 @@ media/*
 !media/.gitkeep
 hw/pcb/.history/
 out/
+__pycache__/
