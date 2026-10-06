@@ -67,4 +67,15 @@ export class DeviceService {
     setHostnameOnboarded()
     await execAsync('sudo reboot')
   }
+
+  // Clean shutdown / restart from Settings or the skip+previous hold. Both
+  // go through /sbin/shutdown, which the sudoers files already allow (see
+  // scripts/install-ota.sh and scripts/setup-pi.sh).
+  async powerOff(): Promise<void> {
+    await execAsync('sudo /sbin/shutdown -h now')
+  }
+
+  async restart(): Promise<void> {
+    await execAsync('sudo /sbin/shutdown -r now')
+  }
 }

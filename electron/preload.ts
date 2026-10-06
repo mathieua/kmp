@@ -112,6 +112,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isOnboarded: () => ipcRenderer.invoke('device:isOnboarded'),
     validateHostname: (name: string) => ipcRenderer.invoke('device:validateHostname', name),
     setHostname: (name: string) => ipcRenderer.invoke('device:setHostname', name),
+    powerOff: () => ipcRenderer.invoke('device:powerOff'),
+    restart: () => ipcRenderer.invoke('device:restart'),
+    onPower: (callback: (event: string) => void) => {
+      const listener = (_: unknown, event: string) => callback(event)
+      ipcRenderer.on('power:event', listener)
+      return () => ipcRenderer.removeListener('power:event', listener)
+    },
   },
 
   // Sync controls

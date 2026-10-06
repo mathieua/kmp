@@ -9,6 +9,7 @@ import { WifiSetup } from './views/WifiSetup'
 import { WifiSettings } from './views/WifiSettings'
 import { BatterySettings } from './views/BatterySettings'
 import { Onboarding } from './views/Onboarding'
+import { PowerOverlay, PowerOverlayState, PowerAction } from './components/PowerOverlay'
 import { useAlarm } from './hooks/useAlarm'
 import { usePlayback } from './hooks/useAudio'
 import './styles/global.css'
@@ -83,6 +84,13 @@ export const STRINGS = {
     voltage: 'Voltage', current: 'Current', power: 'Power', externalPower: 'External power', yes: 'Connected', no: 'Not connected',
     timeRemaining: 'Time remaining', timeToFull: 'Time to full', calculating: 'Calculating…', noBattery: 'No battery detected',
     snd_beep: 'Beep Beep', snd_chime: 'Morning Chime', snd_bird: 'Little Bird', snd_musicbox: 'Music Box',
+    turnOff: 'Turn off', restart: 'Restart',
+    turnOffTitle: 'Turn off the clock?', restartTitle: 'Restart the clock?',
+    turnOffHint: 'Alarms won\'t ring while the clock is off.',
+    slideToTurnOff: 'Slide to turn off', slideToRestart: 'Slide to restart',
+    turningOff: 'Turning off…', restarting: 'Restarting…',
+    safeToSwitchOff: 'When the screen goes dark, you can switch off the battery.',
+    keepHolding: 'Keep holding to turn off', letGoToCancel: 'Let go to cancel',
   },
   fr: {
     alarms: 'Alarmes', music: 'Lecteur', playlists: 'Playlists',
@@ -110,6 +118,13 @@ export const STRINGS = {
     voltage: 'Tension', current: 'Courant', power: 'Puissance', externalPower: 'Alimentation externe', yes: 'Branchée', no: 'Débranchée',
     timeRemaining: 'Autonomie restante', timeToFull: 'Temps avant charge complète', calculating: 'Calcul…', noBattery: 'Aucune batterie détectée',
     snd_beep: 'Bip Bip', snd_chime: 'Carillon du matin', snd_bird: 'Petit oiseau', snd_musicbox: 'Boîte à musique',
+    turnOff: 'Éteindre', restart: 'Redémarrer',
+    turnOffTitle: 'Éteindre l\'horloge ?', restartTitle: 'Redémarrer l\'horloge ?',
+    turnOffHint: 'Les alarmes ne sonneront pas tant que l\'horloge est éteinte.',
+    slideToTurnOff: 'Glisser pour éteindre', slideToRestart: 'Glisser pour redémarrer',
+    turningOff: 'Extinction…', restarting: 'Redémarrage…',
+    safeToSwitchOff: 'Quand l\'écran est noir, vous pouvez couper la batterie.',
+    keepHolding: 'Maintenez pour éteindre', letGoToCancel: 'Relâchez pour annuler',
   },
 } as const
 export type Lang = keyof typeof STRINGS
@@ -175,6 +190,7 @@ function App() {
   // Settings is reachable from every screen, so "back" returns to wherever it was opened from.
   const [returnRoute, setReturnRoute] = useState<Route>('clock')
   const dimTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [power, setPower] = useState<PowerOverlayState | null>(null)
 
   const { alarm, isFiring, snooze, dismiss } = useAlarm()
   const { isPlaying, currentTrack, togglePlayPause } = usePlayback()
@@ -245,6 +261,21 @@ function App() {
       events.forEach(e => window.removeEventListener(e, reset))
     }
   }, [settings.dimSeconds, dimmed, route])
+
+  // Skip+previous hold on the device, and shutdowns/restarts started from
+  // either place (the main process announces them before going down).
+  useEffect(() => window.electronAPI.device.onPower(event => {
+    setDimmed(false)
+    if (event === 'hold') setPower({ mode: 'hold' })
+    else if (event === 'cancel') setPower(p => (p?.mode === 'hold' ? null : p))
+    else setPower({ mode: 'going', action: event })
+  }), [])
+
+  const confirmPower = useCallback((action: PowerAction) => {
+    setPower({ mode: 'going', action })
+    const call = action === 'shutdown' ? window.electronAPI.device.powerOff : window.electronAPI.device.restart
+    call().catch(() => setPower(null))
+  }, [])
 
   const wake = useCallback(() => setDimmed(false), [])
 
@@ -342,6 +373,7 @@ function App() {
               onNavigate={navigate}
               onBack={() => navigate(returnRoute)}
               onRenameDevice={() => setRenameRequested(true)}
+              onPower={action => setPower({ mode: 'confirm', action })}
             />
           )}
         </>
@@ -367,6 +399,10 @@ function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {power && (
+        <PowerOverlay state={power} lang={lang} onConfirm={confirmPower} onCancel={() => setPower(null)} />
       )}
     </Stage>
   )

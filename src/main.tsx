@@ -35,12 +35,23 @@ if (!(window as any).electronAPI) {
       ]),
       connect: () => Promise.resolve(),
       onConnected: () => () => {},
+      getConnection: () => Promise.resolve({ connected: true, ssid: 'Livebox-5BD0', signal: 80 }),
+      switchNetwork: () => Promise.resolve(),
+    },
+    settings: {
+      getDefaultVolume: () => Promise.resolve(50),
+      setDefaultVolume: (v: number) => Promise.resolve(v),
     },
     device: {
       getHostname: () => Promise.resolve('kmp-bedside'),
       isOnboarded: () => Promise.resolve(true),
       validateHostname: () => Promise.resolve(null),
       setHostname: () => Promise.resolve(),
+      getBattery: () => Promise.resolve(null),
+      onBattery: () => () => {},
+      powerOff: () => new Promise(() => {}),
+      restart: () => new Promise(() => {}),
+      onPower: () => () => {},
     },
     sync: { getDevice: () => Promise.resolve(null), getDiff: () => Promise.resolve({ toCopy: [], toSkip: [], orphans: [] }), startSync: () => Promise.resolve(), eject: () => Promise.resolve(), onEvent: () => () => {} },
   }

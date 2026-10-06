@@ -21,6 +21,16 @@ let alarmService: AlarmService
 let wifiService: WifiService
 let deviceService: DeviceService
 let hardwareService: HardwareService
+
+// Shared by the Settings buttons and the skip+previous hold. Tells the UI
+// first so it can show its "turning off" screen, stops playback so the amp
+// is switched off cleanly, then hands over to the OS.
+async function powerAction(action: 'shutdown' | 'restart'): Promise<void> {
+  mainWindow?.webContents.send('power:event', action)
+  await audioService?.stop().catch(() => {})
+  if (action === 'shutdown') await deviceService.powerOff()
+  else await deviceService.restart()
+}
 let libraryService: LibraryService
 // Generated alarm tones (written to the data dir on startup)
 let alarmSounds: Track[] = []
@@ -290,6 +300,8 @@ app.whenReady().then(() => {
   ipcMain.handle('device:isOnboarded', () => deviceService.isOnboarded())
   ipcMain.handle('device:validateHostname', (_, name: string) => deviceService.validateHostname(name))
   ipcMain.handle('device:setHostname', (_, name: string) => deviceService.setHostname(name))
+  ipcMain.handle('device:powerOff', () => powerAction('shutdown'))
+  ipcMain.handle('device:restart', () => powerAction('restart'))
 
   // Forward sync/USB events to renderer
   apiService.sync.onEvent((event, payload) => {
@@ -311,7 +323,10 @@ app.whenReady().then(() => {
   // Hardware integration: only active in production (Pi).
   // In dev the socket connections will silently retry and the sysfs/GPIO
   // paths will not exist — all failures are handled gracefully.
-  hardwareService = new HardwareService(audioService, alarmService)
+  hardwareService = new HardwareService(audioService, alarmService, event => {
+    if (event === 'off') powerAction('shutdown')
+    else mainWindow?.webContents.send('power:event', event)
+  })
   hardwareService.start()
 
   setupIpcHandlers(mediaDir)

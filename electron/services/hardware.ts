@@ -62,6 +62,9 @@ function luxToBrightnessPct(lux: number): number {
   return 100                  // sunlight / near window
 }
 
+/** Skip + previous held together (hw/buttons.py): countdown, cancel, power off. */
+export type PowerButtonEvent = 'hold' | 'cancel' | 'off'
+
 export class HardwareService {
   private audio: AudioService
   private alarm: AlarmService
@@ -73,9 +76,12 @@ export class HardwareService {
   private currentBrightnessPct = -1
   private backlight = findBacklight()
 
-  constructor(audio: AudioService, alarm: AlarmService) {
+  private onPower: (event: PowerButtonEvent) => void
+
+  constructor(audio: AudioService, alarm: AlarmService, onPower: (event: PowerButtonEvent) => void = () => {}) {
     this.audio = audio
     this.alarm = alarm
+    this.onPower = onPower
     if (!this.backlight) {
       console.log('[light_sensor] no backlight device found under ' + BACKLIGHT_ROOT + ', skipping brightness control')
     }
@@ -172,6 +178,9 @@ export class HardwareService {
       case 'skip':       this.audio.playNext();        break
       case 'previous':   this.audio.playPrevious();    break
       case 'snooze':     this.alarm.snooze();          break
+      case 'power_hold':        this.onPower('hold');   break
+      case 'power_hold_cancel': this.onPower('cancel'); break
+      case 'power_off':         this.onPower('off');    break
     }
   }
 

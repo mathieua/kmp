@@ -4,6 +4,8 @@ import { ScreenHeader } from '../components/ScreenHeader'
 import { HeaderActions } from '../components/HeaderActions'
 import { Slider } from '../components/Slider'
 import { useWifiConnection, useBattery } from '../hooks/useStatus'
+import { IconPower, IconRestart } from '../components/Icons'
+import type { PowerAction } from '../components/PowerOverlay'
 
 interface SettingsProps {
   palette: Palette
@@ -13,6 +15,7 @@ interface SettingsProps {
   onNavigate: (r: Route) => void
   onBack: () => void
   onRenameDevice: () => void
+  onPower: (action: PowerAction) => void
 }
 
 // Defined at module level (not inside Settings): a component declared inside
@@ -49,7 +52,20 @@ function Chip({ active, accent, onClick, children }: { active: boolean; accent: 
   )
 }
 
-export function Settings({ palette, lang, settings, onSettings, onNavigate, onBack, onRenameDevice }: SettingsProps) {
+function PowerButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--gap-sm)',
+      padding: 'var(--gap)', borderRadius: 'var(--r)', cursor: 'pointer', fontFamily: 'inherit',
+      background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.18)',
+      color: '#fff', fontWeight: 800, fontSize: 'var(--fs-body)',
+    }}>
+      {icon}{label}
+    </button>
+  )
+}
+
+export function Settings({ palette, lang, settings, onSettings, onNavigate, onBack, onRenameDevice, onPower }: SettingsProps) {
   const wifi = useWifiConnection()
   const battery = useBattery()
   const [defaultVolume, setDefaultVolume] = useState<number | null>(null)
@@ -128,6 +144,11 @@ export function Settings({ palette, lang, settings, onSettings, onNavigate, onBa
         <Row title={t(lang, 'device')}>
           <Chip accent={palette.accentPlay} active={false} onClick={onRenameDevice}>{t(lang, 'renameDevice')}</Chip>
         </Row>
+
+        <div style={{ display: 'flex', gap: 'var(--gap-sm)', flexShrink: 0 }}>
+          <PowerButton icon={<IconRestart size="var(--icon-sm)" />} label={t(lang, 'restart')} onClick={() => onPower('restart')} />
+          <PowerButton icon={<IconPower size="var(--icon-sm)" />} label={t(lang, 'turnOff')} onClick={() => onPower('shutdown')} />
+        </div>
       </div>
     </div>
   )

@@ -96,6 +96,8 @@ export interface Alarm {
   auto_dismiss_minutes: number
 }
 
+export type PowerEvent = 'hold' | 'cancel' | 'shutdown' | 'restart'
+
 export interface ElectronAPI {
   platform: string
   wifi: {
@@ -113,6 +115,10 @@ export interface ElectronAPI {
     isOnboarded: () => Promise<boolean>
     validateHostname: (name: string) => Promise<string | null>
     setHostname: (name: string) => Promise<void>
+    powerOff: () => Promise<void>
+    restart: () => Promise<void>
+    /** 'hold' / 'cancel': skip+previous power-off countdown; 'shutdown' / 'restart': going down now. */
+    onPower: (callback: (event: PowerEvent) => void) => () => void
   }
   alarm: {
     listSounds: () => Promise<Track[]>

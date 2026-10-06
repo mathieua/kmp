@@ -134,6 +134,20 @@ export const IconCheck = (p: IconProps) => (
   <Icon {...p}><path d="M20 6 9 17l-5-5"/></Icon>
 )
 
+export const IconPower = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 2v10"/>
+    <path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>
+  </Icon>
+)
+
+export const IconRestart = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/>
+    <path d="M3 3v5h5"/>
+  </Icon>
+)
+
 /** `bars` is 1-4 signal strength. */
 export const IconWifi = ({ bars = 4, ...p }: IconProps & { bars?: number }) => (
   <Icon {...p}>
